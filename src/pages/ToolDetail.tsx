@@ -1,106 +1,250 @@
 import { useParams, Link } from 'react-router-dom'
-import { Image, ArrowLeft, Upload, Download, Settings, Info } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, Upload, Download, Settings, Info, Image as ImageIcon, X, Package, Trash2, Crop } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useToolStore, IconName } from '../store/useToolStore'
+
+const iconMap: Record<IconName, React.ReactNode> = {
+  image: <ImageIcon className="h-6 w-6" />,
+  crop: <Crop className="h-6 w-6" />
+}
+
+interface ImageItem {
+  id: string
+  file: File
+  fileName: string
+  originalSize: number
+  compressedSize: number
+  previewUrl: string
+  compressedUrl: string
+  status: 'pending' | 'compressing' | 'done' | 'error'
+  errorMsg: string
+}
 
 function ToolDetail() {
   const { id } = useParams<{ id: string }>()
+  const tools = useToolStore(state => state.tools)
+  const tool = tools.find(t => t.id === id)
   const [compressionQuality, setCompressionQuality] = useState(80)
-  const [isCompressing, setIsCompressing] = useState(false)
-  const [compressed, setCompressed] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [originalSize, setOriginalSize] = useState<number>(0)
-  const [compressedSize, setCompressedSize] = useState<number>(0)
-  const [compressedImageUrl, setCompressedImageUrl] = useState<string>('')
-  const [fileName, setFileName] = useState<string>('')
+  const [compressError, setCompressError] = useState('')
+  const [images, setImages] = useState<ImageItem[]>([])
+  const [isBatchCompressing, setIsBatchCompressing] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const qualityRef = useRef(compressionQuality)
 
-  // 处理文件上传
+  useEffect(() => {
+    qualityRef.current = compressionQuality
+  }, [compressionQuality])
+
+  const generateId = () => Math.random().toString(36).substring(2, 9)
+
+  const revokeAllUrls = useCallback((items: ImageItem[]) => {
+    items.forEach(item => {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+      if (item.compressedUrl) URL.revokeObjectURL(item.compressedUrl)
+    })
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      revokeAllUrls(images)
+    }
+  }, [])
+
+  const createImageItem = (file: File): ImageItem => ({
+    id: generateId(),
+    file,
+    fileName: file.name,
+    originalSize: file.size,
+    compressedSize: 0,
+    previewUrl: URL.createObjectURL(file),
+    compressedUrl: '',
+    status: 'pending',
+    errorMsg: ''
+  })
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setSelectedFile(file)
-      setFileName(file.name)
-      setOriginalSize(file.size)
-      setCompressed(false)
-      setCompressedImageUrl('')
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const validFiles = files.filter(file => file.type.startsWith('image/'))
+    if (validFiles.length < files.length) {
+      setCompressError('部分文件不是图片，已自动过滤')
+    } else {
+      setCompressError('')
+    }
+
+    const newItems = validFiles.map(createImageItem)
+    setImages(prev => [...prev, ...newItems])
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
-  // 处理拖拽上传
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    const file = e.dataTransfer.files?.[0]
-    if (file && file.type.startsWith('image/')) {
-      setSelectedFile(file)
-      setFileName(file.name)
-      setOriginalSize(file.size)
-      setCompressed(false)
-      setCompressedImageUrl('')
-    }
-  }
+    const files = Array.from(e.dataTransfer.files || [])
+    if (files.length === 0) return
 
-  // 压缩图片
-  const compressImage = () => {
-    if (!selectedFile) return
-
-    setIsCompressing(true)
-
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    // 使用浏览器原生的Image对象
-    const img = new (window as any).Image()
-
-    img.onload = () => {
-      // 设置 canvas 尺寸
-      canvas.width = img.width
-      canvas.height = img.height
-
-      // 绘制图片
-      ctx?.drawImage(img, 0, 0)
-
-      // 确定输出格式：对于PNG，使用JPEG以获得更好的压缩效果
-      const outputType = selectedFile.type === 'image/png' ? 'image/jpeg' : selectedFile.type
-
-      // 压缩图片
-      canvas.toBlob((blob) => {
-        if (blob) {
-          setCompressedSize(blob.size)
-          const url = URL.createObjectURL(blob)
-          setCompressedImageUrl(url)
-          setCompressed(true)
-          setIsCompressing(false)
-        }
-      }, outputType, compressionQuality / 100)
+    const validFiles = files.filter(file => file.type.startsWith('image/'))
+    if (validFiles.length < files.length) {
+      setCompressError('部分文件不是图片，已自动过滤')
+    } else {
+      setCompressError('')
     }
 
-    img.src = URL.createObjectURL(selectedFile)
+    const newItems = validFiles.map(createImageItem)
+    setImages(prev => [...prev, ...newItems])
   }
 
-  // 下载压缩后的图片
-  const downloadImage = () => {
-    if (!compressedImageUrl) return
+  const compressSingleImage = useCallback((item: ImageItem): Promise<ImageItem> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+      const currentPreviewUrl = URL.createObjectURL(item.file)
+      const currentQuality = qualityRef.current
 
-    // 确定文件扩展名
-    const extension = selectedFile?.type === 'image/png' ? 'jpg' : selectedFile?.type.split('/')[1] || 'jpg'
-    const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, "")
+      img.onload = () => {
+        URL.revokeObjectURL(currentPreviewUrl)
+        canvas.width = img.width
+        canvas.height = img.height
+        ctx?.drawImage(img, 0, 0)
+
+        const outputType = item.file.type === 'image/png' ? 'image/jpeg' : item.file.type
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedUrl = URL.createObjectURL(blob)
+            resolve({
+              ...item,
+              compressedSize: blob.size,
+              compressedUrl,
+              status: 'done',
+              errorMsg: ''
+            })
+          } else {
+            resolve({
+              ...item,
+              status: 'error',
+              errorMsg: '压缩失败'
+            })
+          }
+        }, outputType, currentQuality / 100)
+      }
+
+      img.onerror = () => {
+        URL.revokeObjectURL(currentPreviewUrl)
+        resolve({
+          ...item,
+          status: 'error',
+          errorMsg: '图片加载失败'
+        })
+      }
+
+      img.src = currentPreviewUrl
+    })
+  }, [])
+
+  const compressAllImages = useCallback(async () => {
+    const currentImages = images
+    const pendingImages = currentImages.filter(img => img.status === 'pending')
+    if (pendingImages.length === 0) return
+
+    setIsBatchCompressing(true)
+    setCompressError('')
+
+    for (const item of pendingImages) {
+      setImages(prev => prev.map(img =>
+        img.id === item.id ? { ...img, status: 'compressing' } : img
+      ))
+
+      const result = await compressSingleImage(item)
+
+      setImages(prev => prev.map(img =>
+        img.id === item.id ? result : img
+      ))
+    }
+
+    setIsBatchCompressing(false)
+  }, [images, compressSingleImage])
+
+  const downloadSingleImage = (item: ImageItem) => {
+    if (!item.compressedUrl) return
+    const extension = item.file.type === 'image/png' ? 'jpg' : item.file.type.split('/')[1] || 'jpg'
+    const fileNameWithoutExt = item.fileName.replace(/\.[^/.]+$/, "")
     const downloadFileName = `compressed_${fileNameWithoutExt}.${extension}`
 
     const link = document.createElement('a')
-    link.href = compressedImageUrl
+    link.href = item.compressedUrl
     link.download = downloadFileName
+    document.body.appendChild(link)
     link.click()
+    document.body.removeChild(link)
   }
 
-  // 计算压缩率
-  const getCompressionRatio = () => {
-    if (!originalSize || !compressedSize) return 0
-    return Math.round((1 - compressedSize / originalSize) * 100)
+  const downloadAllImages = useCallback(async () => {
+    const doneImages = images.filter(img => img.status === 'done' && img.compressedUrl)
+    if (doneImages.length === 0) return
+
+    if (doneImages.length === 1) {
+      downloadSingleImage(doneImages[0])
+      return
+    }
+
+    try {
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+
+      for (const item of doneImages) {
+        const response = await fetch(item.compressedUrl)
+        const blob = await response.blob()
+        const extension = item.file.type === 'image/png' ? 'jpg' : item.file.type.split('/')[1] || 'jpg'
+        const fileNameWithoutExt = item.fileName.replace(/\.[^/.]+$/, "")
+        zip.file(`compressed_${fileNameWithoutExt}.${extension}`, blob)
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'compressed_images.zip'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setCompressError('打包下载失败，请尝试单张下载')
+      console.error('Download all error:', err)
+    }
+  }, [images])
+
+  const removeImage = (id: string) => {
+    setImages(prev => {
+      const item = prev.find(img => img.id === id)
+      if (item) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+        if (item.compressedUrl) URL.revokeObjectURL(item.compressedUrl)
+      }
+      return prev.filter(img => img.id !== id)
+    })
   }
 
-  // 格式化文件大小
+  const clearAllImages = () => {
+    revokeAllUrls(images)
+    setImages([])
+    setCompressError('')
+  }
+
+  const getCompressionRatio = (original: number, compressed: number) => {
+    if (!original || !compressed) return 0
+    return Math.round((1 - compressed / original) * 100)
+  }
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -109,175 +253,20 @@ function ToolDetail() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // 模拟工具数据 - 只保留图片压缩工具
-  const tools = {
-    'image-compressor': {
-      title: '图片压缩',
-      description: '压缩图片大小，保持质量，支持多种格式',
-      category: '设计工具',
-      icon: <Image className="h-8 w-8" />,
-      content: (
-        <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 animate-fade-in">
-          <div className="mb-8">
-            <h3 className="text-2xl font-semibold mb-6 flex items-center">
-              <Settings className="h-6 w-6 text-primary-600 mr-2" />
-              图片压缩工具
-            </h3>
-            
-            {/* Drop Zone */}
-            <div 
-              className="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center hover:border-primary-300 transition-colors duration-300"
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-            >
-              {selectedFile ? (
-                <div className="flex flex-col items-center">
-                  <div className="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 mx-auto mb-4">
-                    <Image className="h-12 w-12" />
-                  </div>
-                  <p className="text-secondary-600 mb-2">{fileName}</p>
-                  <p className="text-secondary-500 mb-4">{formatFileSize(originalSize)}</p>
-                  <button 
-                    onClick={() => setSelectedFile(null)}
-                    className="px-4 py-2 bg-gray-100 text-secondary-700 rounded-lg hover:bg-gray-200 transition-colors duration-300"
-                  >
-                    更换图片
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center text-primary-600 mx-auto mb-4">
-                    <Upload className="h-8 w-8" />
-                  </div>
-                  <p className="text-secondary-600 mb-4">点击或拖拽图片到此处上传</p>
-                  <input 
-                    type="file" 
-                    className="hidden" 
-                    id="image-upload" 
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                  />
-                  <label 
-                    htmlFor="image-upload" 
-                    className="btn-primary cursor-pointer inline-block"
-                  >
-                    选择图片
-                  </label>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Compression Settings */}
-          <div className="mb-8">
-            <h4 className="text-lg font-medium mb-4 flex items-center">
-              <Settings className="h-5 w-5 text-primary-600 mr-2" />
-              压缩设置
-            </h4>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <label className="text-secondary-700">压缩质量</label>
-                  <span className="text-primary-600 font-medium">{compressionQuality}%</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="10" 
-                  max="100" 
-                  value={compressionQuality}
-                  onChange={(e) => setCompressionQuality(Number(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
-                />
-                <div className="flex justify-between text-xs text-secondary-500 mt-1">
-                  <span>低质量</span>
-                  <span>中等质量</span>
-                  <span>高质量</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-4">
-            <button 
-              onClick={compressImage}
-              className="w-full btn-primary flex items-center justify-center gap-2"
-              disabled={!selectedFile || isCompressing}
-            >
-              {isCompressing ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  压缩中...
-                </>
-              ) : (
-                '压缩图片'
-              )}
-            </button>
-
-            {/* Compressed Result */}
-            {compressed && compressedImageUrl && (
-              <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-100 animate-fade-in">
-                <div className="flex items-center justify-between mb-4">
-                  <h5 className="font-medium text-green-700">压缩完成</h5>
-                  <span className="text-sm text-green-600">减少了 {getCompressionRatio()}% 的大小</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                  <div>
-                    <h6 className="text-sm font-medium mb-2">原始图片</h6>
-                    {selectedFile && (
-                      <div className="border border-gray-200 rounded-lg p-2">
-                        <img 
-                          src={URL.createObjectURL(selectedFile)} 
-                          alt="原始图片"
-                          className="w-full h-auto rounded"
-                        />
-                        <p className="text-sm text-secondary-600 mt-2">{formatFileSize(originalSize)}</p>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <h6 className="text-sm font-medium mb-2">压缩后图片</h6>
-                    <div className="border border-gray-200 rounded-lg p-2">
-                      <img 
-                        src={compressedImageUrl} 
-                        alt="压缩后图片"
-                        className="w-full h-auto rounded"
-                      />
-                      <p className="text-sm text-secondary-600 mt-2">{formatFileSize(compressedSize)}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <button 
-                    onClick={downloadImage}
-                    className="flex items-center gap-2 text-primary-600 hover:text-primary-700 transition-colors duration-300 px-4 py-2 bg-white border border-primary-200 rounded-lg hover:bg-primary-50"
-                  >
-                    <Download className="h-4 w-4" />
-                    下载图片
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )
-    }
-  }
-
-  const tool = tools[id as keyof typeof tools]
+  const totalOriginalSize = images.reduce((sum, img) => sum + img.originalSize, 0)
+  const totalCompressedSize = images.reduce((sum, img) => sum + (img.compressedSize || 0), 0)
+  const doneCount = images.filter(img => img.status === 'done').length
+  const pendingCount = images.filter(img => img.status === 'pending').length
 
   if (!tool) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-[900px] mx-auto px-4 py-8">
         <div className="text-center py-20 animate-fade-in">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <Info className="h-12 w-12 text-gray-400" />
           </div>
-          <h1 className="text-2xl font-bold mb-4">工具不存在</h1>
-          <Link to="/" className="inline-flex items-center text-primary-600 hover:text-primary-700 transition-colors duration-300">
+          <h1 className="text-2xl font-bold mb-4 text-gray-900">工具不存在</h1>
+          <Link to="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors duration-200">
             <ArrowLeft className="h-5 w-5 mr-2" />
             返回首页
           </Link>
@@ -287,61 +276,841 @@ function ToolDetail() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="max-w-[900px] mx-auto px-4 py-8">
       {/* Breadcrumb */}
       <div className="flex items-center mb-8 text-sm">
-        <Link to="/" className="flex items-center text-secondary-600 hover:text-primary-600 transition-colors duration-300 mr-4">
+        <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 transition-colors duration-200 mr-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           首页
         </Link>
-        <span className="text-gray-400">/</span>
-        <Link to="/categories" className="flex items-center text-secondary-600 hover:text-primary-600 transition-colors duration-300 mx-4">
+        <span className="text-gray-300">/</span>
+        <Link to="/categories" className="flex items-center text-gray-600 hover:text-gray-900 transition-colors duration-200 mx-4">
           分类
         </Link>
-        <span className="text-gray-400">/</span>
-        <span className="mx-4 text-secondary-800 font-medium">{tool.title}</span>
+        <span className="text-gray-300">/</span>
+        <span className="mx-4 text-gray-900 font-medium">{tool.title}</span>
       </div>
 
       {/* Tool Header */}
-      <div className="bg-white rounded-xl shadow-sm p-8 mb-8 border border-gray-100 animate-fade-in">
+      <div className="bg-white rounded-lg shadow-sm p-8 mb-8 border border-gray-100 animate-fade-in">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-          <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 flex-shrink-0">
-            {tool.icon}
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-700 flex-shrink-0">
+            {iconMap[tool.iconName]}
           </div>
           <div className="flex-grow">
-            <h1 className="text-3xl font-bold mb-2">{tool.title}</h1>
-            <div className="inline-block px-4 py-1 bg-primary-50 text-primary-600 rounded-full text-sm font-medium mb-4">
+            <h1 className="text-3xl font-bold mb-2 text-gray-900">{tool.title}</h1>
+            <div className="inline-block px-4 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium mb-4">
               {tool.category}
             </div>
-            <p className="text-secondary-600 text-lg">{tool.description}</p>
+            <p className="text-gray-600 text-lg">{tool.description}</p>
           </div>
         </div>
       </div>
 
-      {/* Tool Content */}
-      {tool.content}
+      {/* Tool Content - 图片压缩工具 */}
+      {tool.id === 'image-compressor' && (
+        <div className="bg-white rounded-lg shadow-sm p-8 border border-gray-100 animate-fade-in">
+          <div className="mb-8">
+            <h3 className="text-2xl font-semibold mb-6 flex items-center text-gray-900">
+              <Settings className="h-6 w-6 text-gray-600 mr-2" />
+              图片压缩工具
+            </h3>
+
+            {/* Drop Zone */}
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:border-gray-400 transition-colors duration-200"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
+              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 mx-auto mb-4">
+                <Upload className="h-8 w-8" />
+              </div>
+              <p className="text-gray-600 mb-4">点击或拖拽图片到此处上传，支持批量上传</p>
+              <input
+                type="file"
+                className="hidden"
+                id="image-upload"
+                accept="image/*"
+                multiple
+                onChange={handleFileUpload}
+                ref={fileInputRef}
+              />
+              <label
+                htmlFor="image-upload"
+                className="btn-primary cursor-pointer inline-block"
+              >
+                选择图片
+              </label>
+            </div>
+            {compressError && (
+              <p className="text-red-500 text-sm mt-2">{compressError}</p>
+            )}
+          </div>
+
+          {/* Image List */}
+          {images.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-medium text-gray-900">
+                  已上传图片 ({images.length}张)
+                </h4>
+                <button
+                  onClick={clearAllImages}
+                  className="flex items-center gap-1.5 text-red-500 hover:text-red-600 transition-colors duration-200 text-sm"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  清空全部
+                </button>
+              </div>
+
+              {/* Stats */}
+              {doneCount > 0 && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                    <span className="text-gray-600">
+                      已完成: <span className="font-medium text-gray-900">{doneCount}/{images.length}</span>
+                    </span>
+                    <span className="text-gray-600">
+                      原始大小: <span className="font-medium text-gray-900">{formatFileSize(totalOriginalSize)}</span>
+                    </span>
+                    <span className="text-gray-600">
+                      压缩后: <span className="font-medium text-gray-900">{formatFileSize(totalCompressedSize)}</span>
+                    </span>
+                    {totalOriginalSize > 0 && totalCompressedSize > 0 && (
+                      <span className="text-green-600 font-medium">
+                        减少 {getCompressionRatio(totalOriginalSize, totalCompressedSize)}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {images.map((item) => (
+                  <div
+                    key={item.id}
+                    className="border border-gray-200 rounded-lg p-4 flex items-center gap-4"
+                  >
+                    {/* Thumbnail */}
+                    <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                      <img
+                        src={item.previewUrl}
+                        alt={item.fileName}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-grow min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{item.fileName}</p>
+                      <p className="text-xs text-gray-500">{formatFileSize(item.originalSize)}</p>
+                      {item.status === 'done' && (
+                        <p className="text-xs text-green-600">
+                          压缩后: {formatFileSize(item.compressedSize)} (减少 {getCompressionRatio(item.originalSize, item.compressedSize)}%)
+                        </p>
+                      )}
+                      {item.status === 'error' && (
+                        <p className="text-xs text-red-500">{item.errorMsg}</p>
+                      )}
+                      {item.status === 'compressing' && (
+                        <p className="text-xs text-gray-500">压缩中...</p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {item.status === 'done' && item.compressedUrl && (
+                        <button
+                          onClick={() => downloadSingleImage(item)}
+                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                          title="下载"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeImage(item.id)}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                        title="删除"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Compression Settings */}
+          {images.length > 0 && (
+            <div className="mb-8">
+              <h4 className="text-lg font-medium mb-4 flex items-center text-gray-900">
+                <Settings className="h-5 w-5 text-gray-600 mr-2" />
+                压缩设置
+              </h4>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <label className="text-gray-700">压缩质量</label>
+                    <span className="text-gray-900 font-medium">{compressionQuality}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={compressionQuality}
+                    onChange={(e) => setCompressionQuality(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>低质量</span>
+                    <span>中等质量</span>
+                    <span>高质量</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={compressAllImages}
+                className="btn-primary flex items-center justify-center gap-2"
+                disabled={pendingCount === 0 || isBatchCompressing}
+              >
+                {isBatchCompressing ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    压缩中...
+                  </>
+                ) : (
+                  <>
+                    <Settings className="h-4 w-4" />
+                    压缩全部 ({pendingCount}张待压缩)
+                  </>
+                )}
+              </button>
+
+              {doneCount > 0 && (
+                <button
+                  onClick={downloadAllImages}
+                  className="btn-secondary flex items-center justify-center gap-2"
+                >
+                  <Package className="h-4 w-4" />
+                  {doneCount === 1 ? '下载图片' : '打包下载全部'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tool Content - 图片裁剪工具 */}
+      {tool.id === 'image-cropper' && <ImageCropperTool />}
 
       {/* Tool Tips */}
-      <div className="bg-blue-50 rounded-xl p-6 mt-8 border border-blue-100 animate-fade-in">
-        <h4 className="text-lg font-medium text-blue-700 mb-4 flex items-center">
+      <div className="bg-gray-50 rounded-lg p-6 mt-8 border border-gray-200 animate-fade-in">
+        <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
           <Info className="h-5 w-5 mr-2" />
           使用提示
         </h4>
-        <ul className="space-y-2 text-blue-700">
-          <li className="flex items-start">
-            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-            <span>选择高质量设置时，图片质量损失较小，但压缩率也较低</span>
-          </li>
-          <li className="flex items-start">
-            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-            <span>支持 JPG、PNG、WebP 等常见图片格式</span>
-          </li>
-          <li className="flex items-start">
-            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-            <span>压缩后的图片会保持原始图片的宽高比</span>
-          </li>
-        </ul>
+        {tool.id === 'image-compressor' && (
+          <ul className="space-y-2 text-gray-700">
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>支持批量上传和压缩多张图片</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>选择高质量设置时，图片质量损失较小，但压缩率也较低</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>支持 JPG、PNG、WebP 等常见图片格式</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>压缩后的图片会保持原始图片的宽高比</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>多张图片会自动打包成 ZIP 文件下载</span>
+            </li>
+          </ul>
+        )}
+        {tool.id === 'image-cropper' && (
+          <ul className="space-y-2 text-gray-700">
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>支持 JPG、PNG、WebP 等常见图片格式</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>提供多种固定比例和自由裁剪模式</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>在图片上拖拽鼠标绘制裁剪区域</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>裁剪框可拖动位置，也可拖动边角调整大小</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>支持选择输出格式（JPG/PNG）和质量调节</span>
+            </li>
+          </ul>
+        )}
       </div>
+    </div>
+  )
+}
+
+function ImageCropperTool() {
+  const [sourceImage, setSourceImage] = useState<string | null>(null)
+  const [fileName, setFileName] = useState('')
+  const [cropError, setCropError] = useState('')
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null)
+  const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 0, height: 0 })
+  const [action, setAction] = useState<'draw' | 'move' | 'resize'>('draw')
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 })
+  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 })
+  const [outputFormat, setOutputFormat] = useState<'image/jpeg' | 'image/png'>('image/jpeg')
+  const [outputQuality, setOutputQuality] = useState(90)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const ratios = [
+    { label: '自由', value: null as number | null },
+    { label: '1:1', value: 1 },
+    { label: '4:3', value: 4 / 3 },
+    { label: '3:4', value: 3 / 4 },
+    { label: '16:9', value: 16 / 9 },
+    { label: '9:16', value: 9 / 16 },
+    { label: '3:2', value: 3 / 2 },
+    { label: '2:3', value: 2 / 3 },
+  ]
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setCropError('请选择图片文件')
+      return
+    }
+    setCropError('')
+    setFileName(file.name)
+    const url = URL.createObjectURL(file)
+    if (sourceImage) URL.revokeObjectURL(sourceImage)
+    setSourceImage(url)
+    setCropArea({ x: 0, y: 0, width: 0, height: 0 })
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setCropError('请选择图片文件')
+      return
+    }
+    setCropError('')
+    setFileName(file.name)
+    const url = URL.createObjectURL(file)
+    if (sourceImage) URL.revokeObjectURL(sourceImage)
+    setSourceImage(url)
+    setCropArea({ x: 0, y: 0, width: 0, height: 0 })
+  }
+
+  const handleImageLoad = () => {
+    const img = imgRef.current
+    const container = containerRef.current
+    if (!img || !container) return
+
+    const containerWidth = container.clientWidth
+    const scale = containerWidth / img.naturalWidth
+    const displayHeight = img.naturalHeight * scale
+
+    setImageSize({ width: img.naturalWidth, height: img.naturalHeight })
+    setDisplaySize({ width: containerWidth, height: displayHeight })
+
+    const initialWidth = containerWidth * 0.6
+    const initialHeight = aspectRatio ? initialWidth / aspectRatio : displayHeight * 0.6
+    setCropArea({
+      x: (containerWidth - initialWidth) / 2,
+      y: (displayHeight - initialHeight) / 2,
+      width: initialWidth,
+      height: initialHeight,
+    })
+  }
+
+  const getMousePos = (e: React.MouseEvent | MouseEvent) => {
+    const container = containerRef.current
+    if (!container) return { x: 0, y: 0 }
+    const rect = container.getBoundingClientRect()
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+  }
+
+  const getCursorAt = (e: React.MouseEvent) => {
+    const pos = getMousePos(e)
+    const handleSize = 12
+    const handles = [
+      { name: 'nw', x: cropArea.x - handleSize, y: cropArea.y - handleSize },
+      { name: 'ne', x: cropArea.x + cropArea.width, y: cropArea.y - handleSize },
+      { name: 'sw', x: cropArea.x - handleSize, y: cropArea.y + cropArea.height },
+      { name: 'se', x: cropArea.x + cropArea.width, y: cropArea.y + cropArea.height },
+    ]
+    for (const h of handles) {
+      if (pos.x >= h.x && pos.x <= h.x + handleSize * 2 && pos.y >= h.y && pos.y <= h.y + handleSize * 2) {
+        return h.name
+      }
+    }
+    if (pos.x >= cropArea.x && pos.x <= cropArea.x + cropArea.width && pos.y >= cropArea.y && pos.y <= cropArea.y + cropArea.height) {
+      return 'inside'
+    }
+    return null
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!sourceImage) return
+    e.preventDefault()
+    const pos = getMousePos(e)
+    const cursorAt = getCursorAt(e)
+
+    if (cursorAt === 'inside') {
+      setAction('move')
+      setDragStart({ x: pos.x - cropArea.x, y: pos.y - cropArea.y })
+    } else if (cursorAt && ['nw', 'ne', 'sw', 'se'].includes(cursorAt)) {
+      setAction('resize')
+      setResizeHandle(cursorAt)
+      setDragStart(pos)
+    } else {
+      setAction('draw')
+      setDragStart(pos)
+      setCropArea({ x: pos.x, y: pos.y, width: 0, height: 0 })
+    }
+  }
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return
+    const pos = getMousePos(e)
+    const container = containerRef.current
+    const rect = container.getBoundingClientRect()
+
+    if (action === 'draw') {
+      let x = Math.min(dragStart.x, pos.x)
+      let y = Math.min(dragStart.y, pos.y)
+      let width = Math.abs(pos.x - dragStart.x)
+      let height = Math.abs(pos.y - dragStart.y)
+
+      x = Math.max(0, Math.min(x, rect.width))
+      y = Math.max(0, Math.min(y, rect.height))
+      width = Math.min(width, rect.width - x)
+      height = Math.min(height, rect.height - y)
+
+      if (aspectRatio) {
+        if (width / height > aspectRatio) {
+          width = height * aspectRatio
+        } else {
+          height = width / aspectRatio
+        }
+      }
+
+      setCropArea({ x, y, width, height })
+    } else if (action === 'move') {
+      let x = pos.x - dragStart.x
+      let y = pos.y - dragStart.y
+      x = Math.max(0, Math.min(x, rect.width - cropArea.width))
+      y = Math.max(0, Math.min(y, rect.height - cropArea.height))
+      setCropArea(prev => ({ ...prev, x, y }))
+    } else if (action === 'resize' && resizeHandle) {
+      let { x, y, width, height } = cropArea
+
+      if (resizeHandle.includes('e')) {
+        width = Math.max(20, Math.min(pos.x - x, rect.width - x))
+      }
+      if (resizeHandle.includes('w')) {
+        const newX = Math.max(0, Math.min(pos.x, x + width - 20))
+        width = x + width - newX
+        x = newX
+      }
+      if (resizeHandle.includes('s')) {
+        height = Math.max(20, Math.min(pos.y - y, rect.height - y))
+      }
+      if (resizeHandle.includes('n')) {
+        const newY = Math.max(0, Math.min(pos.y, y + height - 20))
+        height = y + height - newY
+        y = newY
+      }
+
+      if (aspectRatio) {
+        if (width / height > aspectRatio) {
+          width = height * aspectRatio
+        } else {
+          height = width / aspectRatio
+        }
+        if (resizeHandle.includes('w')) x = cropArea.x + cropArea.width - width
+        if (resizeHandle.includes('n')) y = cropArea.y + cropArea.height - height
+      }
+
+      setCropArea({ x, y, width, height })
+    }
+  }, [action, dragStart, aspectRatio, cropArea, resizeHandle])
+
+  const handleMouseUp = useCallback(() => {
+    setAction('draw')
+    setResizeHandle(null)
+  }, [])
+
+  useEffect(() => {
+    if (action !== 'draw') {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [action, handleMouseMove, handleMouseUp])
+
+  const handleCrop = () => {
+    if (!sourceImage || !imgRef.current || cropArea.width < 10 || cropArea.height < 10) return
+
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const scaleX = imageSize.width / displaySize.width
+    const scaleY = imageSize.height / displaySize.height
+
+    const sourceX = cropArea.x * scaleX
+    const sourceY = cropArea.y * scaleY
+    const sourceWidth = cropArea.width * scaleX
+    const sourceHeight = cropArea.height * scaleY
+
+    canvas.width = sourceWidth
+    canvas.height = sourceHeight
+
+    ctx.drawImage(
+      imgRef.current,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      sourceWidth,
+      sourceHeight
+    )
+
+    const mimeType = outputFormat
+    const extension = mimeType === 'image/png' ? 'png' : 'jpg'
+
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const ext = fileName.replace(/\.[^/.]+$/, '') || 'cropped'
+      link.download = `cropped_${ext}.${extension}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }, mimeType, outputQuality / 100)
+  }
+
+  const clearImage = () => {
+    if (sourceImage) URL.revokeObjectURL(sourceImage)
+    setSourceImage(null)
+    setFileName('')
+    setCropArea({ x: 0, y: 0, width: 0, height: 0 })
+    setCropError('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-8 border border-gray-100 animate-fade-in">
+      <div className="mb-8">
+        <h3 className="text-2xl font-semibold mb-6 flex items-center text-gray-900">
+          <Crop className="h-6 w-6 text-gray-600 mr-2" />
+          图片裁剪工具
+        </h3>
+
+        {/* Upload */}
+        {!sourceImage && (
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:border-gray-400 transition-colors duration-200"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 mx-auto mb-4">
+              <Upload className="h-8 w-8" />
+            </div>
+            <p className="text-gray-600 mb-4">点击或拖拽图片到此处上传</p>
+            <input
+              type="file"
+              className="hidden"
+              id="crop-upload"
+              accept="image/*"
+              onChange={handleFileUpload}
+              ref={fileInputRef}
+            />
+            <label htmlFor="crop-upload" className="btn-primary cursor-pointer inline-block">
+              选择图片
+            </label>
+          </div>
+        )}
+        {cropError && <p className="text-red-500 text-sm mt-2">{cropError}</p>}
+      </div>
+
+      {/* Cropper */}
+      {sourceImage && (
+        <div className="space-y-6">
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-gray-700 font-medium">裁剪比例:</span>
+            {ratios.map((r) => (
+              <button
+                key={r.label}
+                onClick={() => {
+                  setAspectRatio(r.value)
+                  if (cropArea.width > 0 && cropArea.height > 0 && r.value && displaySize.width > 0) {
+                    const newHeight = cropArea.width / r.value
+                    const newY = Math.min(cropArea.y, displaySize.height - newHeight)
+                    setCropArea({ ...cropArea, y: Math.max(0, newY), height: newHeight })
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  aspectRatio === r.value
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+            <button
+              onClick={clearImage}
+              className="ml-auto flex items-center gap-1.5 text-red-500 hover:text-red-600 transition-colors duration-200 text-sm"
+            >
+              <X className="h-4 w-4" />
+              重新选择
+            </button>
+          </div>
+
+          {/* Image with crop overlay */}
+          <div
+            ref={containerRef}
+            className="relative bg-gray-100 rounded-lg overflow-hidden cursor-crosshair select-none"
+            onMouseDown={handleMouseDown}
+            style={{ minHeight: 200 }}
+          >
+            <img
+              ref={imgRef}
+              src={sourceImage}
+              alt="待裁剪"
+              className="w-full h-auto block"
+              onLoad={handleImageLoad}
+              draggable={false}
+            />
+            {/* Dark overlay */}
+            {cropArea.width > 0 && cropArea.height > 0 && (
+              <>
+                <div
+                  className="absolute bg-black/40 pointer-events-none"
+                  style={{
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: cropArea.y,
+                  }}
+                />
+                <div
+                  className="absolute bg-black/40 pointer-events-none"
+                  style={{
+                    top: cropArea.y,
+                    left: 0,
+                    width: cropArea.x,
+                    height: cropArea.height,
+                  }}
+                />
+                <div
+                  className="absolute bg-black/40 pointer-events-none"
+                  style={{
+                    top: cropArea.y,
+                    left: cropArea.x + cropArea.width,
+                    width: `calc(100% - ${cropArea.x + cropArea.width}px)`,
+                    height: cropArea.height,
+                  }}
+                />
+                <div
+                  className="absolute bg-black/40 pointer-events-none"
+                  style={{
+                    top: cropArea.y + cropArea.height,
+                    left: 0,
+                    width: '100%',
+                    height: `calc(100% - ${cropArea.y + cropArea.height}px)`,
+                  }}
+                />
+                {/* Crop border */}
+                <div
+                  className="absolute border-2 border-white"
+                  style={{
+                    left: cropArea.x,
+                    top: cropArea.y,
+                    width: cropArea.width,
+                    height: cropArea.height,
+                    cursor: 'move',
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    const pos = getMousePos(e)
+                    setAction('move')
+                    setDragStart({ x: pos.x - cropArea.x, y: pos.y - cropArea.y })
+                  }}
+                >
+                  {/* Grid lines */}
+                  <div className="absolute inset-0 flex pointer-events-none">
+                    <div className="flex-1 border-r border-white/50" />
+                    <div className="flex-1 border-r border-white/50" />
+                    <div className="flex-1" />
+                  </div>
+                  <div className="absolute inset-0 flex flex-col pointer-events-none">
+                    <div className="flex-1 border-b border-white/50" />
+                    <div className="flex-1 border-b border-white/50" />
+                    <div className="flex-1" />
+                  </div>
+                  {/* Resize handles */}
+                  {(['nw', 'ne', 'sw', 'se'] as const).map((h) => {
+                    const style: React.CSSProperties = {
+                      position: 'absolute',
+                      width: 12,
+                      height: 12,
+                      backgroundColor: 'white',
+                      border: '1px solid #374151',
+                      borderRadius: 2,
+                      zIndex: 10,
+                    }
+                    if (h.includes('n')) style.top = -6
+                    if (h.includes('s')) style.bottom = -6
+                    if (h.includes('w')) style.left = -6
+                    if (h.includes('e')) style.right = -6
+                    const cursorMap: Record<string, string> = {
+                      nw: 'nw-resize',
+                      ne: 'ne-resize',
+                      sw: 'sw-resize',
+                      se: 'se-resize',
+                    }
+                    return (
+                      <div
+                        key={h}
+                        style={{ ...style, cursor: cursorMap[h] }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation()
+                          setAction('resize')
+                          setResizeHandle(h)
+                          setDragStart(getMousePos(e))
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Info */}
+          {cropArea.width > 0 && cropArea.height > 0 && (
+            <p className="text-sm text-gray-600">
+              裁剪区域: {Math.round(cropArea.width * (imageSize.width / displaySize.width))} x{' '}
+              {Math.round(cropArea.height * (imageSize.height / displaySize.height))} px
+            </p>
+          )}
+
+          {/* Output Settings */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-sm text-gray-700 font-medium">输出格式:</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setOutputFormat('image/jpeg')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                    outputFormat === 'image/jpeg'
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  JPG
+                </button>
+                <button
+                  onClick={() => setOutputFormat('image/png')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                    outputFormat === 'image/png'
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  PNG
+                </button>
+              </div>
+            </div>
+
+            {outputFormat === 'image/jpeg' && (
+              <div>
+                <div className="flex justify-between mb-2">
+                  <label className="text-sm text-gray-700">输出质量</label>
+                  <span className="text-sm text-gray-900 font-medium">{outputQuality}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={outputQuality}
+                  onChange={(e) => setOutputQuality(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>低质量（体积小）</span>
+                  <span>高质量（体积大）</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleCrop}
+              className="btn-primary flex items-center justify-center gap-2"
+              disabled={cropArea.width < 10 || cropArea.height < 10}
+            >
+              <Download className="h-4 w-4" />
+              裁剪并下载
+            </button>
+            <p className="text-xs text-gray-500 self-center">
+              拖拽绘制裁剪区域，拖动框移动位置，拖动边角调整大小
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
