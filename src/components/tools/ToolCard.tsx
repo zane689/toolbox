@@ -31,9 +31,9 @@ function ToolCard({ id, title, description, category, iconName }: ToolCardProps)
   }
 
   return (
-    <Link to={`/tool/${id}`} className="block group">
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer">
-        <div className="p-5">
+    <Link to={`/tool/${id}`} className="block group h-full">
+      <div className="h-full bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col">
+        <div className="p-5 flex flex-col flex-1">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="text-gray-600">
@@ -56,7 +56,7 @@ function ToolCard({ id, title, description, category, iconName }: ToolCardProps)
           <p className="text-gray-600 text-sm mb-4 line-clamp-2">
             {description}
           </p>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-auto pt-2">
             <div className="inline-block px-2.5 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-medium">
               {category}
             </div>

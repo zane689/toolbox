@@ -13,8 +13,27 @@ function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
-          <Link to="/" className="text-xl font-bold text-gray-900">
-            设计师工具
+          <Link to="/" className="flex items-center gap-2.5 text-xl font-bold">
+            <span className="relative inline-flex items-center justify-center h-9 w-9 rounded-xl bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700 shadow-sm">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="h-5 w-5 text-white"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 21l3.5-1 9.2-9.2a2.4 2.4 0 0 0 0-3.4l-.6-.6a2.4 2.4 0 0 0-3.4 0L2.5 16l-.5 5z" />
+                <path d="M14 7l3 3" />
+                <path d="M16 5l3 3" />
+              </svg>
+              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-white ring-2 ring-neutral-900" />
+            </span>
+            <span className="text-neutral-900 tracking-tight">
+              设计师工具
+            </span>
           </Link>
 
           {/* Desktop Navigation */}

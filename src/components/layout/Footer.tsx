@@ -12,12 +12,12 @@ function Footer() {
           <div>
             <h4 className="text-base font-semibold mb-3">联系我们</h4>
             <ul className="space-y-2 text-gray-400 text-sm">
-              <li>邮箱: contact@designertools.com</li>
+              <li>邮箱: tongboh@163.com</li>
             </ul>
           </div>
         </div>
         <div className="border-t border-gray-800 mt-8 pt-6 text-center">
-          <p className="text-gray-500 text-sm">© 2024 设计师工具网站. 保留所有权利.</p>
+          <p className="text-gray-500 text-sm">© 2026 设计师工具网站. 保留所有权利.</p>
         </div>
       </div>
     </footer>

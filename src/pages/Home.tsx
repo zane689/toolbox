@@ -71,7 +71,7 @@ function Home() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {tools.map((tool, index) => (
-                <div key={tool.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                <div key={tool.id} className="animate-fade-in h-full" style={{ animationDelay: `${index * 0.1}s` }}>
                   <ToolCard
                     id={tool.id}
                     title={tool.title}
