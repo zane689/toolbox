@@ -691,7 +691,6 @@ function ImageCropperTool() {
       height: initialHeight,
     })
   }
-
   const getMousePos = (e: React.MouseEvent | MouseEvent) => {
     const container = containerRef.current
     if (!container) return { x: 0, y: 0 }
@@ -953,9 +952,9 @@ function ImageCropperTool() {
           {/* Image with crop overlay */}
           <div
             ref={containerRef}
-            className="relative bg-gray-100 rounded-lg overflow-auto cursor-crosshair select-none flex justify-center"
+            className="relative bg-gray-100 rounded-lg cursor-crosshair select-none flex justify-center"
             onMouseDown={handleMouseDown}
-            style={{ minHeight: 200, height: displaySize.height || 'auto', maxHeight: 'calc(100vh - 200px)' }}
+            style={{ minHeight: 200, height: displaySize.height || 'auto' }}
           >
             <img
               ref={imgRef}
@@ -966,109 +965,70 @@ function ImageCropperTool() {
               draggable={false}
               style={{ width: displaySize.width || '100%', height: displaySize.height || 'auto' }}
             />
-            {/* Dark overlay */}
+            {/* Crop overlay */}
             {cropArea.width > 0 && cropArea.height > 0 && (
-              <>
-                <div
-                  className="absolute bg-black/40 pointer-events-none"
-                  style={{
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: cropArea.y,
-                  }}
-                />
-                <div
-                  className="absolute bg-black/40 pointer-events-none"
-                  style={{
-                    top: cropArea.y,
-                    left: 0,
-                    width: cropArea.x,
-                    height: cropArea.height,
-                  }}
-                />
-                <div
-                  className="absolute bg-black/40 pointer-events-none"
-                  style={{
-                    top: cropArea.y,
-                    left: cropArea.x + cropArea.width,
-                    right: 0,
-                    height: cropArea.height,
-                  }}
-                />
-                <div
-                  className="absolute bg-black/40 pointer-events-none"
-                  style={{
-                    top: cropArea.y + cropArea.height,
-                    left: 0,
-                    right: 0,
-                    height: `calc(100% - ${cropArea.y + cropArea.height}px)`,
-                  }}
-                />
-                {/* Crop border */}
-                <div
-                  className="absolute border-2 border-white"
-                  style={{
-                    left: cropArea.x,
-                    top: cropArea.y,
-                    width: cropArea.width,
-                    height: cropArea.height,
-                    cursor: 'move',
-                  }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    const pos = getMousePos(e)
-                    setAction('move')
-                    setDragStart({ x: pos.x - cropArea.x, y: pos.y - cropArea.y })
-                  }}
-                >
-                  {/* Grid lines */}
-                  <div className="absolute inset-0 flex pointer-events-none">
-                    <div className="flex-1 border-r border-white/50" />
-                    <div className="flex-1 border-r border-white/50" />
-                    <div className="flex-1" />
-                  </div>
-                  <div className="absolute inset-0 flex flex-col pointer-events-none">
-                    <div className="flex-1 border-b border-white/50" />
-                    <div className="flex-1 border-b border-white/50" />
-                    <div className="flex-1" />
-                  </div>
-                  {/* Resize handles */}
-                  {(['nw', 'ne', 'sw', 'se'] as const).map((h) => {
-                    const style: React.CSSProperties = {
-                      position: 'absolute',
-                      width: 12,
-                      height: 12,
-                      backgroundColor: 'white',
-                      border: '1px solid #374151',
-                      borderRadius: 2,
-                      zIndex: 10,
-                    }
-                    if (h.includes('n')) style.top = -6
-                    if (h.includes('s')) style.bottom = -6
-                    if (h.includes('w')) style.left = -6
-                    if (h.includes('e')) style.right = -6
-                    const cursorMap: Record<string, string> = {
-                      nw: 'nw-resize',
-                      ne: 'ne-resize',
-                      sw: 'sw-resize',
-                      se: 'se-resize',
-                    }
-                    return (
-                      <div
-                        key={h}
-                        style={{ ...style, cursor: cursorMap[h] }}
-                        onMouseDown={(e) => {
-                          e.stopPropagation()
-                          setAction('resize')
-                          setResizeHandle(h)
-                          setDragStart(getMousePos(e))
-                        }}
-                      />
-                    )
-                  })}
+              <div
+                className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+                style={{
+                  left: cropArea.x,
+                  top: cropArea.y,
+                  width: cropArea.width,
+                  height: cropArea.height,
+                  cursor: 'move',
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  const pos = getMousePos(e)
+                  setAction('move')
+                  setDragStart({ x: pos.x - cropArea.x, y: pos.y - cropArea.y })
+                }}
+              >
+                {/* Grid lines */}
+                <div className="absolute inset-0 flex pointer-events-none">
+                  <div className="flex-1 border-r border-white/50" />
+                  <div className="flex-1 border-r border-white/50" />
+                  <div className="flex-1" />
                 </div>
-              </>
+                <div className="absolute inset-0 flex flex-col pointer-events-none">
+                  <div className="flex-1 border-b border-white/50" />
+                  <div className="flex-1 border-b border-white/50" />
+                  <div className="flex-1" />
+                </div>
+                {/* Resize handles */}
+                {(['nw', 'ne', 'sw', 'se'] as const).map((h) => {
+                  const style: React.CSSProperties = {
+                    position: 'absolute',
+                    width: 12,
+                    height: 12,
+                    backgroundColor: 'white',
+                    border: '1px solid #374151',
+                    borderRadius: 2,
+                    zIndex: 10,
+                  }
+                  if (h.includes('n')) style.top = -6
+                  if (h.includes('s')) style.bottom = -6
+                  if (h.includes('w')) style.left = -6
+                  if (h.includes('e')) style.right = -6
+                  const cursorMap: Record<string, string> = {
+                    nw: 'nw-resize',
+                    ne: 'ne-resize',
+                    sw: 'sw-resize',
+                    se: 'se-resize',
+                  }
+                  return (
+                    <div
+                      key={h}
+                      style={{ ...style, cursor: cursorMap[h] }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation()
+                        setAction('resize')
+                        setResizeHandle(h)
+                        setDragStart(getMousePos(e))
+                      }}
+                    />
+                  )
+                })}
+              </div>
             )}
           </div>
 
