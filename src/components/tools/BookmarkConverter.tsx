@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from 'react'
 import { Upload, Download, X, FileText, Folder, Link as LinkIcon, FileType, ChevronDown, ChevronRight } from 'lucide-react'
-import { jsPDF } from 'jspdf'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import {
   Document,
   Packer,
@@ -11,27 +11,15 @@ import {
 } from 'docx'
 import { saveAs } from './utils/saveAs'
 
-const FONT_NAME = 'NotoSansSC'
 const FONT_FILE = '/fonts/NotoSansSC-Regular.ttf'
 
-const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  const len = bytes.byteLength
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
-
-let fontBase64Cache: string | null = null
-const loadFontBase64 = async (): Promise<string> => {
-  if (fontBase64Cache) return fontBase64Cache
+let fontBytesCache: ArrayBuffer | null = null
+const loadFont = async (): Promise<ArrayBuffer> => {
+  if (fontBytesCache) return fontBytesCache
   const res = await fetch(FONT_FILE)
   if (!res.ok) throw new Error('字体文件加载失败')
-  const buf = await res.arrayBuffer()
-  fontBase64Cache = arrayBufferToBase64(buf)
-  return fontBase64Cache
+  fontBytesCache = await res.arrayBuffer()
+  return fontBytesCache
 }
 
 interface BookmarkItem {
@@ -159,15 +147,24 @@ function BookmarkConverter() {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const buildPdfParagraphs = (items: BookmarkItem[], depth = 0): { text: string; size: number; isBold: boolean; isLink: boolean; url?: string }[] => {
-    const out: { text: string; size: number; isBold: boolean; isLink: boolean; url?: string }[] = []
+  interface PdfRow {
+    text: string
+    size: number
+    indent: number
+    isBold: boolean
+    isLink: boolean
+    url?: string
+  }
+
+  const buildPdfRows = (items: BookmarkItem[], depth = 0): PdfRow[] => {
+    const out: PdfRow[] = []
     for (const it of items) {
       if (it.type === 'folder') {
-        out.push({ text: '  '.repeat(depth) + '▸ ' + it.title, size: 13 - depth * 0.5, isBold: true, isLink: false })
-        out.push(...buildPdfParagraphs(it.children, depth + 1))
+        out.push({ text: '▸ ' + it.title, size: 15, indent: depth * 12, isBold: true, isLink: false })
+        out.push(...buildPdfRows(it.children, depth + 1))
       } else {
-        out.push({ text: '  '.repeat(depth) + '• ' + it.title, size: 10, isBold: false, isLink: true, url: it.url })
-        if (it.url) out.push({ text: '  '.repeat(depth + 1) + it.url, size: 8, isBold: false, isLink: false })
+        out.push({ text: '• ' + it.title, size: 11, indent: depth * 12, isBold: false, isLink: true, url: it.url })
+        if (it.url) out.push({ text: it.url, size: 9, indent: depth * 12 + 10, isBold: false, isLink: false })
       }
     }
     return out
@@ -178,55 +175,78 @@ function BookmarkConverter() {
     setIsConverting(true)
     setError('')
     try {
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
-      const fontBase64 = await loadFontBase64()
-      pdf.addFileToVFS('NotoSansSC-Regular.ttf', fontBase64)
-      pdf.addFont('NotoSansSC-Regular.ttf', FONT_NAME, 'normal')
+      const pdfDoc = await PDFDocument.create()
+      const fontBytes = await loadFont()
+      const customFont = await pdfDoc.embedFont(fontBytes)
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
+      const pageWidth = 595.28
+      const pageHeight = 841.89
       const margin = 40
-      const lineHeight = 14
-      let y = margin
+      const lineGap = 2
+      let page = pdfDoc.addPage([pageWidth, pageHeight])
+      let y = pageHeight - margin
 
-      pdf.setFont(FONT_NAME, 'normal')
-      pdf.setFontSize(18)
-      pdf.text('Bookmarks Export', margin, y)
-      y += lineHeight * 1.5
-
-      pdf.setFontSize(9)
-      pdf.text(`来源: ${fileName}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹`, margin, y)
-      y += lineHeight * 1.5
-
-      const lines = buildPdfParagraphs(bookmarks)
-      pdf.setFontSize(10)
-
-      for (const line of lines) {
-        const textWidth = pageWidth - margin * 2
-        const wrapped = pdf.splitTextToSize(line.text, textWidth) as string[]
-        const fontSize = Math.max(7, line.size)
-        pdf.setFontSize(fontSize)
-
-        for (const w of wrapped) {
-          if (y + lineHeight > pageHeight - margin) {
-            pdf.addPage()
-            y = margin
-          }
-          if (line.isLink && line.url) {
-            pdf.setTextColor(30, 80, 200)
-            pdf.textWithLink(w, margin, y, { url: line.url })
-            pdf.setTextColor(0, 0, 0)
+      const wrapText = (text: string, size: number, maxWidth: number): string[] => {
+        const chars = Array.from(text)
+        const lines: string[] = []
+        let line = ''
+        for (const char of chars) {
+          const test = line + char
+          const width = customFont.widthOfTextAtSize(test, size)
+          if (width > maxWidth && line.length > 0) {
+            lines.push(line)
+            line = char
           } else {
-            pdf.setFont(FONT_NAME, line.isBold ? 'bold' : 'normal')
-            pdf.text(w, margin, y)
-            pdf.setFont(FONT_NAME, 'normal')
+            line = test
           }
-          y += lineHeight
+        }
+        if (line) lines.push(line)
+        return lines
+      }
+
+      const drawText = (text: string, size: number, x: number, color = rgb(0, 0, 0), bold = false) => {
+        page.drawText(text, { x, y, size, font: bold ? helveticaBold : customFont, color })
+      }
+
+      drawText('Bookmarks Export', 20, margin, rgb(0, 0, 0), true)
+      y -= 22
+
+      drawText(`来源: ${fileName}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹`, 9, margin)
+      y -= 22
+
+      const rows = buildPdfRows(bookmarks)
+      const maxTextWidth = pageWidth - margin * 2
+
+      for (const row of rows) {
+        const font = row.isBold ? helveticaBold : customFont
+        const fontSize = row.size
+        const x = margin + row.indent
+        const availableWidth = maxTextWidth - row.indent
+        const wrapped = wrapText(row.text, fontSize, availableWidth)
+
+        for (const line of wrapped) {
+          if (y - fontSize < margin) {
+            page = pdfDoc.addPage([pageWidth, pageHeight])
+            y = pageHeight - margin
+          }
+          const color = row.isLink ? rgb(0.12, 0.31, 0.78) : rgb(0, 0, 0)
+          page.drawText(line, {
+            x,
+            y: y - fontSize,
+            size: fontSize,
+            font,
+            color,
+          })
+          y -= fontSize + lineGap
         }
       }
 
+      const pdfBytes = await pdfDoc.save()
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
       const baseName = fileName.replace(/\.(html?|htm)$/i, '') || 'bookmarks'
-      pdf.save(`${baseName}.pdf`)
+      saveAs(blob, `${baseName}.pdf`)
     } catch (e) {
       setError('PDF 生成失败: ' + (e as Error).message)
     } finally {
