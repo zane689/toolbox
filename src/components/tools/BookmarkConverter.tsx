@@ -11,6 +11,29 @@ import {
 } from 'docx'
 import { saveAs } from './utils/saveAs'
 
+const FONT_NAME = 'NotoSansSC'
+const FONT_FILE = '/fonts/NotoSansSC-Regular.ttf'
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const len = bytes.byteLength
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+let fontBase64Cache: string | null = null
+const loadFontBase64 = async (): Promise<string> => {
+  if (fontBase64Cache) return fontBase64Cache
+  const res = await fetch(FONT_FILE)
+  if (!res.ok) throw new Error('字体文件加载失败')
+  const buf = await res.arrayBuffer()
+  fontBase64Cache = arrayBufferToBase64(buf)
+  return fontBase64Cache
+}
+
 interface BookmarkItem {
   type: 'folder' | 'link'
   title: string
@@ -156,20 +179,23 @@ function BookmarkConverter() {
     setError('')
     try {
       const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+      const fontBase64 = await loadFontBase64()
+      pdf.addFileToVFS('NotoSansSC-Regular.ttf', fontBase64)
+      pdf.addFont('NotoSansSC-Regular.ttf', FONT_NAME, 'normal')
+
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
       const margin = 40
       const lineHeight = 14
       let y = margin
 
-      pdf.setFont('helvetica', 'bold')
+      pdf.setFont(FONT_NAME, 'normal')
       pdf.setFontSize(18)
       pdf.text('Bookmarks Export', margin, y)
       y += lineHeight * 1.5
 
-      pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(9)
-      pdf.text(`Source: ${fileName}  |  Total: ${totalLinks} links / ${totalFolders} folders`, margin, y)
+      pdf.text(`来源: ${fileName}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹`, margin, y)
       y += lineHeight * 1.5
 
       const lines = buildPdfParagraphs(bookmarks)
@@ -191,9 +217,9 @@ function BookmarkConverter() {
             pdf.textWithLink(w, margin, y, { url: line.url })
             pdf.setTextColor(0, 0, 0)
           } else {
-            pdf.setFont('helvetica', line.isBold ? 'bold' : 'normal')
+            pdf.setFont(FONT_NAME, line.isBold ? 'bold' : 'normal')
             pdf.text(w, margin, y)
-            pdf.setFont('helvetica', 'normal')
+            pdf.setFont(FONT_NAME, 'normal')
           }
           y += lineHeight
         }
