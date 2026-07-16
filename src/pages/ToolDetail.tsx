@@ -671,7 +671,7 @@ function ImageCropperTool() {
     if (!img || !container) return
 
     const containerWidth = container.clientWidth
-    const maxHeight = Math.max(280, window.innerHeight - 320)
+    const maxHeight = Math.max(360, window.innerHeight - 220)
     const scaleByWidth = containerWidth / img.naturalWidth
     const scaleByHeight = maxHeight / img.naturalHeight
     const scale = Math.min(scaleByWidth, scaleByHeight, 1)
