@@ -22,6 +22,13 @@ const loadFont = async (): Promise<ArrayBuffer> => {
   return fontBytesCache
 }
 
+const isTtcFont = (bytes: ArrayBuffer): boolean => {
+  const view = new DataView(bytes, 0, 4)
+  const tag = view.getUint32(0, false)
+  return tag === 0x74746366 // 'ttcf'
+}
+
+
 interface BookmarkItem {
   type: 'folder' | 'link'
   title: string
@@ -177,7 +184,9 @@ function BookmarkConverter() {
     try {
       const pdfDoc = await PDFDocument.create()
       const fontBytes = await loadFont()
-      const customFont = await pdfDoc.embedFont(fontBytes)
+      const customFont = isTtcFont(fontBytes)
+        ? await pdfDoc.embedFont(fontBytes, { subset: true })
+        : await pdfDoc.embedFont(fontBytes)
       const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
@@ -211,10 +220,10 @@ function BookmarkConverter() {
       }
 
       drawText('Bookmarks Export', 20, margin, rgb(0, 0, 0), true)
-      y -= 22
+      y -= 26
 
       drawText(`来源: ${fileName}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹`, 9, margin)
-      y -= 22
+      y -= 18
 
       const rows = buildPdfRows(bookmarks)
       const maxTextWidth = pageWidth - margin * 2
