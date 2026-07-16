@@ -29,3 +29,7 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+# Fonts
+public/fonts/*.ttf
+public/fonts/*.ttc
+public/fonts/*.otf
