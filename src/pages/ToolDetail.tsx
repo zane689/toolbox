@@ -671,7 +671,7 @@ function ImageCropperTool() {
     if (!img || !container) return
 
     const containerWidth = container.clientWidth
-    const maxHeight = Math.max(360, window.innerHeight - 220)
+    const maxHeight = Math.max(720, (window.innerHeight - 220) * 2)
     const scaleByWidth = containerWidth / img.naturalWidth
     const scaleByHeight = maxHeight / img.naturalHeight
     const scale = Math.min(scaleByWidth, scaleByHeight, 1)
@@ -952,9 +952,9 @@ function ImageCropperTool() {
           {/* Image with crop overlay */}
           <div
             ref={containerRef}
-            className="relative bg-gray-100 rounded-lg overflow-hidden cursor-crosshair select-none"
+            className="relative bg-gray-100 rounded-lg overflow-auto cursor-crosshair select-none"
             onMouseDown={handleMouseDown}
-            style={{ minHeight: 200, height: displaySize.height || 'auto' }}
+            style={{ minHeight: 200, height: displaySize.height || 'auto', maxHeight: 'calc(100vh - 200px)' }}
           >
             <img
               ref={imgRef}
