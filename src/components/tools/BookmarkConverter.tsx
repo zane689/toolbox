@@ -59,9 +59,9 @@ function BookmarkConverter() {
       const children = Array.from(dl.children).filter((el) => el.tagName === 'DT')
 
       for (const dt of children) {
-        const h3 = dt.querySelector(':scope > H3')
+        const h3 = dt.querySelector(':scope > H3, :scope > h3')
         if (h3) {
-          const nestedDL = dt.querySelector(':scope > DL')
+          const nestedDL = dt.querySelector(':scope > DL, :scope > dl')
           result.push({
             type: 'folder',
             title: h3.textContent?.trim() || '未命名文件夹',
@@ -70,14 +70,14 @@ function BookmarkConverter() {
           })
           continue
         }
-        const a = dt.querySelector(':scope > A')
+        const a = dt.querySelector(':scope > A, :scope > a')
         if (a) {
           result.push({
             type: 'link',
-            title: a.textContent?.trim() || a.getAttribute('HREF') || '未命名链接',
-            url: a.getAttribute('HREF') || '',
-            addDate: a.getAttribute('ADD_DATE') || undefined,
-            icon: a.getAttribute('ICON') || undefined,
+            title: a.textContent?.trim() || a.getAttribute('HREF') || a.getAttribute('href') || '未命名链接',
+            url: a.getAttribute('HREF') || a.getAttribute('href') || '',
+            addDate: a.getAttribute('ADD_DATE') || a.getAttribute('add_date') || undefined,
+            icon: a.getAttribute('ICON') || a.getAttribute('icon') || undefined,
             children: [],
           })
         }
@@ -355,7 +355,7 @@ function BookmarkConverter() {
             <label htmlFor="bookmark-upload" className="btn-primary cursor-pointer inline-block">
               选择文件
             </label>
-            <p className="text-xs text-gray-400 mt-4">支持 Chrome / Edge / Firefox 导出的 .html 书签文件</p>
+            <p className="text-xs text-gray-400 mt-4">支持 Chrome / Edge / Firefox / Opera / QQ浏览器 导出的 .html 书签文件</p>
           </div>
         )}
 

@@ -577,7 +577,7 @@ function ToolDetail() {
           <ul className="space-y-2 text-gray-700">
             <li className="flex items-start">
               <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>支持 Chrome / Edge / Firefox 浏览器导出的 HTML 书签文件</span>
+              <span>支持 Chrome / Edge / Firefox / Opera / QQ浏览器 浏览器导出的 HTML 书签文件</span>
             </li>
             <li className="flex items-start">
               <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
