@@ -681,7 +681,8 @@ function ImageCropperTool() {
     setImageSize({ width: img.naturalWidth, height: img.naturalHeight })
     setDisplaySize({ width: displayWidth, height: displayHeight })
 
-    const initialWidth = displayWidth * 0.6
+    const fitContainerWidth = Math.min(displayWidth, containerWidth)
+    const initialWidth = fitContainerWidth * 0.6
     const initialHeight = aspectRatio ? initialWidth / aspectRatio : displayHeight * 0.6
     setCropArea({
       x: (displayWidth - initialWidth) / 2,
@@ -952,7 +953,7 @@ function ImageCropperTool() {
           {/* Image with crop overlay */}
           <div
             ref={containerRef}
-            className="relative bg-gray-100 rounded-lg overflow-auto cursor-crosshair select-none"
+            className="relative bg-gray-100 rounded-lg overflow-auto cursor-crosshair select-none flex justify-center"
             onMouseDown={handleMouseDown}
             style={{ minHeight: 200, height: displaySize.height || 'auto', maxHeight: 'calc(100vh - 200px)' }}
           >
@@ -991,7 +992,7 @@ function ImageCropperTool() {
                   style={{
                     top: cropArea.y,
                     left: cropArea.x + cropArea.width,
-                    width: `calc(100% - ${cropArea.x + cropArea.width}px)`,
+                    right: 0,
                     height: cropArea.height,
                   }}
                 />
@@ -1000,7 +1001,7 @@ function ImageCropperTool() {
                   style={{
                     top: cropArea.y + cropArea.height,
                     left: 0,
-                    width: '100%',
+                    right: 0,
                     height: `calc(100% - ${cropArea.y + cropArea.height}px)`,
                   }}
                 />
