@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { Upload, Download, X, FileText, Folder, Link as LinkIcon, FileType, ChevronDown, ChevronRight } from 'lucide-react'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
 import {
   Document,
   Packer,
@@ -25,9 +26,8 @@ const loadFont = async (): Promise<ArrayBuffer> => {
 const isTtcFont = (bytes: ArrayBuffer): boolean => {
   const view = new DataView(bytes, 0, 4)
   const tag = view.getUint32(0, false)
-  return tag === 0x74746366 // 'ttcf'
+  return tag === 0x74746366
 }
-
 
 interface BookmarkItem {
   type: 'folder' | 'link'
@@ -183,12 +183,12 @@ function BookmarkConverter() {
     setError('')
     try {
       const pdfDoc = await PDFDocument.create()
+      pdfDoc.registerFontkit(fontkit)
+
       const fontBytes = await loadFont()
       const customFont = isTtcFont(fontBytes)
         ? await pdfDoc.embedFont(fontBytes, { subset: true })
         : await pdfDoc.embedFont(fontBytes)
-      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
-      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
       const pageWidth = 595.28
       const pageHeight = 841.89
@@ -215,21 +215,25 @@ function BookmarkConverter() {
         return lines
       }
 
-      const drawText = (text: string, size: number, x: number, color = rgb(0, 0, 0), bold = false) => {
-        page.drawText(text, { x, y, size, font: bold ? helveticaBold : customFont, color })
-      }
-
-      drawText('Bookmarks Export', 20, margin, rgb(0, 0, 0), true)
+      page.drawText('Bookmarks Export', {
+        x: margin,
+        y,
+        size: 20,
+        font: customFont,
+        color: rgb(0, 0, 0),
+      })
       y -= 26
 
-      drawText(`来源: ${fileName}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹`, 9, margin)
+      page.drawText(
+        `来源: ${fileName}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹`,
+        { x: margin, y, size: 9, font: customFont, color: rgb(0.4, 0.4, 0.4) }
+      )
       y -= 18
 
       const rows = buildPdfRows(bookmarks)
       const maxTextWidth = pageWidth - margin * 2
 
       for (const row of rows) {
-        const font = row.isBold ? helveticaBold : customFont
         const fontSize = row.size
         const x = margin + row.indent
         const availableWidth = maxTextWidth - row.indent
@@ -245,7 +249,7 @@ function BookmarkConverter() {
             x,
             y: y - fontSize,
             size: fontSize,
-            font,
+            font: customFont,
             color,
           })
           y -= fontSize + lineGap
@@ -257,6 +261,7 @@ function BookmarkConverter() {
       const baseName = fileName.replace(/\.(html?|htm)$/i, '') || 'bookmarks'
       saveAs(blob, `${baseName}.pdf`)
     } catch (e) {
+      console.error('PDF 生成失败:', e)
       setError('PDF 生成失败: ' + (e as Error).message)
     } finally {
       setIsConverting(false)
