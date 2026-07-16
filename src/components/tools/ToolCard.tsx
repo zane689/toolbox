@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
-import { Heart, ArrowRight, Image, Crop } from 'lucide-react'
+import { Heart, ArrowRight, Image, Crop, Bookmark } from 'lucide-react'
 import { useToolStore, IconName } from '../../store/useToolStore'
 
 const iconMap: Record<IconName, React.ReactNode> = {
   image: <Image className="h-6 w-6" />,
-  crop: <Crop className="h-6 w-6" />
+  crop: <Crop className="h-6 w-6" />,
+  bookmark: <Bookmark className="h-6 w-6" />
 }
 
 interface ToolCardProps {

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type IconName = 'image' | 'crop'
+export type IconName = 'image' | 'crop' | 'bookmark'
 
 interface Tool {
   id: string
@@ -36,6 +36,13 @@ const mockTools: Tool[] = [
     description: '支持多种比例裁剪图片，自由调整裁剪区域',
     category: '设计工具',
     iconName: 'crop'
+  },
+  {
+    id: 'bookmark-converter',
+    title: '书签转换',
+    description: '将浏览器导出的 HTML 书签文件转换为 PDF 或 Word 格式',
+    category: '效率工具',
+    iconName: 'bookmark'
   }
 ]
 

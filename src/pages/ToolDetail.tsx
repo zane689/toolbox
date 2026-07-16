@@ -1,11 +1,13 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Upload, Download, Settings, Info, Image as ImageIcon, X, Package, Trash2, Crop } from 'lucide-react'
+import { ArrowLeft, Upload, Download, Settings, Info, Image as ImageIcon, X, Package, Trash2, Crop, Bookmark } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToolStore, IconName } from '../store/useToolStore'
+import BookmarkConverter from '../components/tools/BookmarkConverter'
 
 const iconMap: Record<IconName, React.ReactNode> = {
   image: <ImageIcon className="h-6 w-6" />,
-  crop: <Crop className="h-6 w-6" />
+  crop: <Crop className="h-6 w-6" />,
+  bookmark: <Bookmark className="h-6 w-6" />
 }
 
 interface ImageItem {
@@ -514,6 +516,9 @@ function ToolDetail() {
       {/* Tool Content - 图片裁剪工具 */}
       {tool.id === 'image-cropper' && <ImageCropperTool />}
 
+      {/* Tool Content - 书签转换工具 */}
+      {tool.id === 'bookmark-converter' && <BookmarkConverter />}
+
       {/* Tool Tips */}
       <div className="bg-gray-50 rounded-lg p-6 mt-8 border border-gray-200 animate-fade-in">
         <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
@@ -565,6 +570,30 @@ function ToolDetail() {
             <li className="flex items-start">
               <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
               <span>支持选择输出格式（JPG/PNG）和质量调节</span>
+            </li>
+          </ul>
+        )}
+        {tool.id === 'bookmark-converter' && (
+          <ul className="space-y-2 text-gray-700">
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>支持 Chrome / Edge / Firefox 浏览器导出的 HTML 书签文件</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>自动解析文件夹结构、链接标题和添加时间</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>可一键导出为 PDF 文件（链接可点击跳转）</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>可一键导出为 Word (.docx) 文档，保留层级结构</span>
+            </li>
+            <li className="flex items-start">
+              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+              <span>所有处理均在浏览器本地完成，文件不会上传到服务器</span>
             </li>
           </ul>
         )}
