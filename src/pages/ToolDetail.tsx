@@ -671,16 +671,20 @@ function ImageCropperTool() {
     if (!img || !container) return
 
     const containerWidth = container.clientWidth
-    const scale = containerWidth / img.naturalWidth
+    const maxHeight = Math.max(280, window.innerHeight - 320)
+    const scaleByWidth = containerWidth / img.naturalWidth
+    const scaleByHeight = maxHeight / img.naturalHeight
+    const scale = Math.min(scaleByWidth, scaleByHeight, 1)
+    const displayWidth = img.naturalWidth * scale
     const displayHeight = img.naturalHeight * scale
 
     setImageSize({ width: img.naturalWidth, height: img.naturalHeight })
-    setDisplaySize({ width: containerWidth, height: displayHeight })
+    setDisplaySize({ width: displayWidth, height: displayHeight })
 
-    const initialWidth = containerWidth * 0.6
+    const initialWidth = displayWidth * 0.6
     const initialHeight = aspectRatio ? initialWidth / aspectRatio : displayHeight * 0.6
     setCropArea({
-      x: (containerWidth - initialWidth) / 2,
+      x: (displayWidth - initialWidth) / 2,
       y: (displayHeight - initialHeight) / 2,
       width: initialWidth,
       height: initialHeight,
@@ -950,15 +954,16 @@ function ImageCropperTool() {
             ref={containerRef}
             className="relative bg-gray-100 rounded-lg overflow-hidden cursor-crosshair select-none"
             onMouseDown={handleMouseDown}
-            style={{ minHeight: 200 }}
+            style={{ minHeight: 200, height: displaySize.height || 'auto' }}
           >
             <img
               ref={imgRef}
               src={sourceImage}
               alt="待裁剪"
-              className="w-full h-auto block"
+              className="block"
               onLoad={handleImageLoad}
               draggable={false}
+              style={{ width: displaySize.width || '100%', height: displaySize.height || 'auto' }}
             />
             {/* Dark overlay */}
             {cropArea.width > 0 && cropArea.height > 0 && (

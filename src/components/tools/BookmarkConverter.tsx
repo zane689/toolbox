@@ -1,7 +1,5 @@
 import { useState, useRef, useMemo } from 'react'
 import { Upload, Download, X, FileText, Folder, Link as LinkIcon, FileType, ChevronDown, ChevronRight } from 'lucide-react'
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
-import fontkit from '@pdf-lib/fontkit'
 import {
   Document,
   Packer,
@@ -11,23 +9,6 @@ import {
   AlignmentType,
 } from 'docx'
 import { saveAs } from './utils/saveAs'
-
-const FONT_FILE = '/fonts/NotoSansSC-Regular.ttf'
-
-let fontBytesCache: ArrayBuffer | null = null
-const loadFont = async (): Promise<ArrayBuffer> => {
-  if (fontBytesCache) return fontBytesCache
-  const res = await fetch(FONT_FILE)
-  if (!res.ok) throw new Error('字体文件加载失败')
-  fontBytesCache = await res.arrayBuffer()
-  return fontBytesCache
-}
-
-const isTtcFont = (bytes: ArrayBuffer): boolean => {
-  const view = new DataView(bytes, 0, 4)
-  const tag = view.getUint32(0, false)
-  return tag === 0x74746366
-}
 
 interface BookmarkItem {
   type: 'folder' | 'link'
@@ -154,112 +135,96 @@ function BookmarkConverter() {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  interface PdfRow {
-    text: string
-    size: number
-    indent: number
-    isBold: boolean
-    isLink: boolean
-    url?: string
-  }
-
-  const buildPdfRows = (items: BookmarkItem[], depth = 0): PdfRow[] => {
-    const out: PdfRow[] = []
+  const buildPrintRows = (items: BookmarkItem[], depth = 0): string => {
+    let html = ''
     for (const it of items) {
       if (it.type === 'folder') {
-        out.push({ text: '▸ ' + it.title, size: 15, indent: depth * 12, isBold: true, isLink: false })
-        out.push(...buildPdfRows(it.children, depth + 1))
+        html += `<div class="folder" style="margin-left:${depth * 16}px">▸ ${escapeHtml(it.title)}</div>`
+        html += buildPrintRows(it.children, depth + 1)
       } else {
-        out.push({ text: '• ' + it.title, size: 11, indent: depth * 12, isBold: false, isLink: true, url: it.url })
-        if (it.url) out.push({ text: it.url, size: 9, indent: depth * 12 + 10, isBold: false, isLink: false })
+        html += `<div class="link" style="margin-left:${depth * 16}px">• ${escapeHtml(it.title)}</div>`
+        if (it.url) {
+          html += `<div class="url" style="margin-left:${depth * 16 + 16}px">${escapeHtml(it.url)}</div>`
+        }
       }
     }
-    return out
+    return html
   }
+
+  const escapeHtml = (s: string): string =>
+    s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 
   const downloadAsPdf = async () => {
     if (bookmarks.length === 0) return
     setIsConverting(true)
     setError('')
     try {
-      const pdfDoc = await PDFDocument.create()
-      pdfDoc.registerFontkit(fontkit)
-
-      const fontBytes = await loadFont()
-      const customFont = isTtcFont(fontBytes)
-        ? await pdfDoc.embedFont(fontBytes, { subset: true })
-        : await pdfDoc.embedFont(fontBytes)
-
-      const pageWidth = 595.28
-      const pageHeight = 841.89
-      const margin = 40
-      const lineGap = 2
-      let page = pdfDoc.addPage([pageWidth, pageHeight])
-      let y = pageHeight - margin
-
-      const wrapText = (text: string, size: number, maxWidth: number): string[] => {
-        const chars = Array.from(text)
-        const lines: string[] = []
-        let line = ''
-        for (const char of chars) {
-          const test = line + char
-          const width = customFont.widthOfTextAtSize(test, size)
-          if (width > maxWidth && line.length > 0) {
-            lines.push(line)
-            line = char
-          } else {
-            line = test
-          }
-        }
-        if (line) lines.push(line)
-        return lines
-      }
-
-      page.drawText('Bookmarks Export', {
-        x: margin,
-        y,
-        size: 20,
-        font: customFont,
-        color: rgb(0, 0, 0),
-      })
-      y -= 26
-
-      page.drawText(
-        `来源: ${fileName}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹`,
-        { x: margin, y, size: 9, font: customFont, color: rgb(0.4, 0.4, 0.4) }
-      )
-      y -= 18
-
-      const rows = buildPdfRows(bookmarks)
-      const maxTextWidth = pageWidth - margin * 2
-
-      for (const row of rows) {
-        const fontSize = row.size
-        const x = margin + row.indent
-        const availableWidth = maxTextWidth - row.indent
-        const wrapped = wrapText(row.text, fontSize, availableWidth)
-
-        for (const line of wrapped) {
-          if (y - fontSize < margin) {
-            page = pdfDoc.addPage([pageWidth, pageHeight])
-            y = pageHeight - margin
-          }
-          const color = row.isLink ? rgb(0.12, 0.31, 0.78) : rgb(0, 0, 0)
-          page.drawText(line, {
-            x,
-            y: y - fontSize,
-            size: fontSize,
-            font: customFont,
-            color,
-          })
-          y -= fontSize + lineGap
-        }
-      }
-
-      const pdfBytes = await pdfDoc.save()
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
       const baseName = fileName.replace(/\.(html?|htm)$/i, '') || 'bookmarks'
-      saveAs(blob, `${baseName}.pdf`)
+      const rowsHtml = buildPrintRows(bookmarks)
+      const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeHtml(baseName)}</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+      "Microsoft YaHei", "WenQuanYi Micro Hei", "Noto Sans CJK SC", "Source Han Sans SC",
+      "Helvetica Neue", Arial, sans-serif;
+    color: #111;
+    font-size: 11pt;
+    line-height: 1.55;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1 { font-size: 18pt; margin: 0 0 6pt 0; }
+  .meta { color: #666; font-size: 9pt; margin-bottom: 14pt; }
+  .folder { font-weight: 600; font-size: 12pt; margin-top: 6pt; }
+  .link { margin-top: 1pt; word-break: break-all; }
+  .url { color: #1f4fb3; font-size: 9pt; margin-top: 0; word-break: break-all; }
+  a { color: #1f4fb3; text-decoration: none; }
+</style></head><body>
+<h1>Bookmarks Export</h1>
+<div class="meta">来源: ${escapeHtml(fileName || 'bookmarks')}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹</div>
+${rowsHtml}
+</body></html>`
+
+      const iframe = document.createElement('iframe')
+      iframe.setAttribute('aria-hidden', 'true')
+      iframe.style.position = 'fixed'
+      iframe.style.right = '0'
+      iframe.style.bottom = '0'
+      iframe.style.width = '0'
+      iframe.style.height = '0'
+      iframe.style.border = '0'
+      document.body.appendChild(iframe)
+
+      const cleanup = () => {
+        try { document.body.removeChild(iframe) } catch {}
+      }
+
+      const printDone = new Promise<void>((resolve) => {
+        const handleAfterPrint = () => {
+          iframe.contentWindow?.removeEventListener('afterprint', handleAfterPrint)
+          resolve()
+        }
+        iframe.addEventListener('load', () => {
+          // Wait one extra frame so layout/fonts settle before invoking print.
+          requestAnimationFrame(() => {
+            try {
+              iframe.contentWindow?.addEventListener('afterprint', handleAfterPrint, { once: true })
+              iframe.contentWindow?.focus()
+              iframe.contentWindow?.print()
+            } catch (e) {
+              resolve()
+            }
+          })
+        })
+        // Safety: in case 'afterprint' never fires (some Chromium versions), unblock after 60s.
+        setTimeout(() => resolve(), 60000)
+      })
+
+      iframe.srcdoc = html
+      await printDone
+      cleanup()
     } catch (e) {
       console.error('PDF 生成失败:', e)
       setError('PDF 生成失败: ' + (e as Error).message)
