@@ -968,13 +968,14 @@ function ImageCropperTool() {
             {/* Crop overlay */}
             {cropArea.width > 0 && cropArea.height > 0 && (
               <div
-                className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+                className="absolute border-2 border-white"
                 style={{
                   left: cropArea.x,
                   top: cropArea.y,
                   width: cropArea.width,
                   height: cropArea.height,
                   cursor: 'move',
+                  boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
                 }}
                 onMouseDown={(e) => {
                   e.stopPropagation()
