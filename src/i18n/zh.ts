@@ -94,7 +94,6 @@ const zh = {
     cropBtn: '裁剪并下载',
     helper: '拖拽绘制裁剪区域，拖动框移动位置，拖动边角调整大小',
     png: 'PNG',
-    exportMeta: '来源: {file} | 共 {links} 个链接 / {folders} 个文件夹',
     tips: [
       '支持 JPG、PNG、WebP 等常见图片格式',
       '提供多种固定比例和自由裁剪模式',
@@ -123,6 +122,7 @@ const zh = {
     errorWord: 'Word 生成失败',
     unnamedFolder: '未命名文件夹',
     unnamedLink: '未命名链接',
+    exportMeta: '来源: {file} | 共 {links} 个链接 / {folders} 个文件夹',
     tips: [
       '支持 Chrome / Edge / Firefox / Opera / QQ浏览器 浏览器导出的 HTML 书签文件',
       '自动解析文件夹结构、链接标题和添加时间',

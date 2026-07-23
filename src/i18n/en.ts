@@ -94,7 +94,6 @@ const en: typeof import('./zh').default = {
     cropBtn: 'Crop & Download',
     helper: 'Drag to draw crop area, drag the box to move, drag corners to resize',
     png: 'PNG',
-    exportMeta: 'Source: {file} | {links} links / {folders} folders',
     tips: [
       'Supports JPG, PNG, WebP and other common image formats',
       'Provides multiple preset ratios and free mode',
@@ -123,6 +122,7 @@ const en: typeof import('./zh').default = {
     errorWord: 'Word generation failed',
     unnamedFolder: 'Unnamed Folder',
     unnamedLink: 'Unnamed Link',
+    exportMeta: 'Source: {file} | {links} links / {folders} folders',
     tips: [
       'Supports HTML bookmark files exported from Chrome / Edge / Firefox / Opera / QQ Browser',
       'Automatically parses folder structure, link titles and add dates',
