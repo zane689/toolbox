@@ -1,10 +1,27 @@
 import { useToolStore } from '../store/useToolStore'
 import ToolCard from '../components/tools/ToolCard'
 import { Lightbulb, Zap, Layout } from 'lucide-react'
+import { useI18n } from '../i18n/context'
 
 function Home() {
+  const { t } = useI18n()
   const getFilteredTools = useToolStore(state => state.getFilteredTools)
   const tools = getFilteredTools()
+
+  const toolLabel = (id: string) => {
+    const map: Record<string, { title: string; desc: string; cat: string }> = {
+      'image-compressor': { title: t.tools.imageCompressor, desc: t.tools.imageCompressorDesc, cat: t.tools.designTool },
+      'image-cropper': { title: t.tools.imageCropper, desc: t.tools.imageCropperDesc, cat: t.tools.designTool },
+      'bookmark-converter': { title: t.tools.bookmarkConverter, desc: t.tools.bookmarkConverterDesc, cat: t.tools.efficiencyTool },
+    }
+    return map[id] || { title: id, desc: '', cat: '' }
+  }
+
+  const getToolCategoryKey = (category: string): string => {
+    if (category === '设计工具') return t.tools.designTool
+    if (category === '效率工具') return t.tools.efficiencyTool
+    return category
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -13,17 +30,17 @@ function Home() {
         <section className="text-center mb-20 pt-8 animate-fade-in">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight text-gray-900">
-              设计师的工具箱
+              {t.home.heading}
             </h1>
             <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-              为设计师提供各种实用工具，让你的工作更加高效和专业
+              {t.home.subtitle}
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <button className="btn-primary">
-                开始使用
+                {t.home.startBtn}
               </button>
               <button className="btn-secondary">
-                了解更多
+                {t.home.learnMore}
               </button>
             </div>
           </div>
@@ -36,22 +53,22 @@ function Home() {
               <div className="inline-block p-2 bg-white rounded-lg mb-4 shadow-sm">
                 <Lightbulb className="h-6 w-6 text-gray-700" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">创意工具</h3>
-              <p className="text-gray-600 text-sm">提供各种创意工具，帮助你激发灵感</p>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t.home.feature1Title}</h3>
+              <p className="text-gray-600 text-sm">{t.home.feature1Desc}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-6 text-center card-hover">
               <div className="inline-block p-2 bg-white rounded-lg mb-4 shadow-sm">
                 <Zap className="h-6 w-6 text-gray-700" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">高效工作</h3>
-              <p className="text-gray-600 text-sm">简化设计流程，提高工作效率</p>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t.home.feature2Title}</h3>
+              <p className="text-gray-600 text-sm">{t.home.feature2Desc}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-6 text-center card-hover">
               <div className="inline-block p-2 bg-white rounded-lg mb-4 shadow-sm">
                 <Layout className="h-6 w-6 text-gray-700" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">专业品质</h3>
-              <p className="text-gray-600 text-sm">提供专业级工具，确保设计质量</p>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t.home.feature3Title}</h3>
+              <p className="text-gray-600 text-sm">{t.home.feature3Desc}</p>
             </div>
           </div>
         </section>
@@ -59,28 +76,31 @@ function Home() {
         {/* Tools Grid */}
         <section className="mb-16 animate-slide-up">
           <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold mb-3 text-gray-900">精选工具</h2>
+            <h2 className="text-2xl font-bold mb-3 text-gray-900">{t.home.toolsSectionTitle}</h2>
             <p className="text-gray-600 max-w-xl mx-auto text-sm">
-              我们精心挑选了各种实用工具，满足设计师的不同需求
+              {t.home.toolsSectionDesc}
             </p>
           </div>
           {tools.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-gray-500">没有找到匹配的工具</p>
+              <p className="text-gray-500">{t.home.noMatch}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {tools.map((tool, index) => (
-                <div key={tool.id} className="animate-fade-in h-full" style={{ animationDelay: `${index * 0.1}s` }}>
-                  <ToolCard
-                    id={tool.id}
-                    title={tool.title}
-                    description={tool.description}
-                    category={tool.category}
-                    iconName={tool.iconName}
-                  />
-                </div>
-              ))}
+              {tools.map((tool, index) => {
+                const labels = toolLabel(tool.id)
+                return (
+                  <div key={tool.id} className="animate-fade-in h-full" style={{ animationDelay: `${index * 0.1}s` }}>
+                    <ToolCard
+                      id={tool.id}
+                      title={labels.title}
+                      description={labels.desc}
+                      category={getToolCategoryKey(tool.category)}
+                      iconName={tool.iconName}
+                    />
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>

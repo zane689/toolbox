@@ -9,6 +9,7 @@ import {
   AlignmentType,
 } from 'docx'
 import { saveAs } from './utils/saveAs'
+import { useI18n } from '../../i18n/context'
 
 interface BookmarkItem {
   type: 'folder' | 'link'
@@ -19,16 +20,17 @@ interface BookmarkItem {
   children: BookmarkItem[]
 }
 
-const formatTimestamp = (ts?: string) => {
+const formatTimestamp = (ts?: string, locale = 'zh-CN') => {
   if (!ts) return ''
   const num = parseInt(ts, 10)
   if (isNaN(num) || num <= 0) return ''
   const d = new Date(num < 1e12 ? num * 1000 : num)
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleString('zh-CN', { hour12: false })
+  return d.toLocaleString(locale, { hour12: false })
 }
 
 function BookmarkConverter() {
+  const { t } = useI18n()
   const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([])
@@ -63,7 +65,7 @@ function BookmarkConverter() {
           const nestedDL = dt.querySelector(':scope > DL, :scope > dl')
           result.push({
             type: 'folder',
-            title: h3.textContent?.trim() || '未命名文件夹',
+            title: h3.textContent?.trim() || t.bookmarkConverter.unnamedFolder,
             addDate: h3.getAttribute('ADD_DATE') || undefined,
             children: buildFromDL(nestedDL),
           })
@@ -73,7 +75,7 @@ function BookmarkConverter() {
         if (a) {
           result.push({
             type: 'link',
-            title: a.textContent?.trim() || a.getAttribute('HREF') || a.getAttribute('href') || '未命名链接',
+            title: a.textContent?.trim() || a.getAttribute('HREF') || a.getAttribute('href') || t.bookmarkConverter.unnamedLink,
             url: a.getAttribute('HREF') || a.getAttribute('href') || '',
             addDate: a.getAttribute('ADD_DATE') || a.getAttribute('add_date') || undefined,
             icon: a.getAttribute('ICON') || a.getAttribute('icon') || undefined,
@@ -91,20 +93,20 @@ function BookmarkConverter() {
   const handleFile = async (file: File) => {
     setError('')
     if (!file.name.toLowerCase().endsWith('.html') && !file.name.toLowerCase().endsWith('.htm')) {
-      setError('请选择 HTML 格式的书签文件')
+      setError(t.bookmarkConverter.errorFileType)
       return
     }
     try {
       const text = await file.text()
       const parsed = parseBookmarks(text)
       if (parsed.length === 0) {
-        setError('未能从文件中解析出书签，请确认文件格式')
+        setError(t.bookmarkConverter.errorParse)
         return
       }
       setBookmarks(parsed)
       setFileName(file.name)
     } catch (e) {
-      setError('文件读取失败: ' + (e as Error).message)
+      setError(t.bookmarkConverter.errorRead + ': ' + (e as Error).message)
     }
   }
 
@@ -183,7 +185,7 @@ function BookmarkConverter() {
   a { color: #1f4fb3; text-decoration: none; }
 </style></head><body>
 <h1>Bookmarks Export</h1>
-<div class="meta">来源: ${escapeHtml(fileName || 'bookmarks')}  |  共 ${totalLinks} 个链接 / ${totalFolders} 个文件夹</div>
+<div class="meta">${t.bookmarkConverter.exportMeta.replace('{file}', escapeHtml(fileName || 'bookmarks')).replace('{links}', String(totalLinks)).replace('{folders}', String(totalFolders))}</div>
 ${rowsHtml}
 </body></html>`
 
@@ -226,8 +228,8 @@ ${rowsHtml}
       await printDone
       cleanup()
     } catch (e) {
-      console.error('PDF 生成失败:', e)
-      setError('PDF 生成失败: ' + (e as Error).message)
+      console.error(t.bookmarkConverter.errorPdf + ':', e)
+      setError(t.bookmarkConverter.errorPdf + ': ' + (e as Error).message)
     } finally {
       setIsConverting(false)
     }
@@ -245,7 +247,7 @@ ${rowsHtml}
         )
         paras.push(...buildDocxChildren(it.children))
       } else {
-        const dateStr = formatTimestamp(it.addDate)
+        const dateStr = formatTimestamp(it.addDate, navigator.language)
         paras.push(
           new Paragraph({
             children: [
@@ -272,7 +274,7 @@ ${rowsHtml}
     setError('')
     try {
       const doc = new Document({
-        creator: '设计师工具',
+        creator: t.footer.brand,
         title: 'Bookmarks Export',
         description: 'Converted from HTML bookmark file',
         sections: [
@@ -287,7 +289,10 @@ ${rowsHtml}
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `来源: ${fileName}  |  共 ${totalLinks} 个链接，${totalFolders} 个文件夹`,
+                    text: t.bookmarkConverter.exportMeta
+                      .replace('{file}', fileName)
+                      .replace('{links}', String(totalLinks))
+                      .replace('{folders}', String(totalFolders)),
                     italics: true,
                   }),
                 ],
@@ -304,7 +309,7 @@ ${rowsHtml}
       const baseName = fileName.replace(/\.(html?|htm)$/i, '') || 'bookmarks'
       saveAs(blob, `${baseName}.docx`)
     } catch (e) {
-      setError('Word 生成失败: ' + (e as Error).message)
+      setError(t.bookmarkConverter.errorWord + ': ' + (e as Error).message)
     } finally {
       setIsConverting(false)
     }
@@ -355,9 +360,9 @@ ${rowsHtml}
     <div className="bg-white rounded-lg shadow-sm p-8 border border-gray-100 animate-fade-in">
       <div className="mb-8">
         <h3 className="text-2xl font-semibold mb-6 flex items-center text-gray-900">
-          <FileText className="h-6 w-6 text-gray-600 mr-2" />
-          书签转换工具
-        </h3>
+            <FileText className="h-6 w-6 text-gray-600 mr-2" />
+            {t.bookmarkConverter.title}
+          </h3>
 
         {!bookmarks.length && (
           <div
@@ -368,7 +373,7 @@ ${rowsHtml}
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 mx-auto mb-4">
               <Upload className="h-8 w-8" />
             </div>
-            <p className="text-gray-600 mb-4">点击或拖拽浏览器导出的书签 HTML 文件到此处</p>
+            <p className="text-gray-600 mb-4">{t.bookmarkConverter.dropzone}</p>
             <input
               type="file"
               className="hidden"
@@ -378,9 +383,9 @@ ${rowsHtml}
               ref={fileInputRef}
             />
             <label htmlFor="bookmark-upload" className="btn-primary cursor-pointer inline-block">
-              选择文件
+              {t.bookmarkConverter.uploadBtn}
             </label>
-            <p className="text-xs text-gray-400 mt-4">支持 Chrome / Edge / Firefox / Opera / QQ浏览器 导出的 .html 书签文件</p>
+            <p className="text-xs text-gray-400 mt-4">{t.bookmarkConverter.supportedFormats}</p>
           </div>
         )}
 
@@ -395,28 +400,28 @@ ${rowsHtml}
               <span className="font-medium truncate max-w-[260px]">{fileName}</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-gray-500 ml-2">
-              <span>链接 <span className="text-gray-900 font-medium">{totalLinks}</span></span>
+              <span>{t.bookmarkConverter.links} <span className="text-gray-900 font-medium">{totalLinks}</span></span>
               <span>·</span>
-              <span>文件夹 <span className="text-gray-900 font-medium">{totalFolders}</span></span>
+              <span>{t.bookmarkConverter.folders} <span className="text-gray-900 font-medium">{totalFolders}</span></span>
             </div>
             <button
               onClick={reset}
               className="ml-auto flex items-center gap-1.5 text-red-500 hover:text-red-600 transition-colors duration-200 text-sm"
             >
               <X className="h-4 w-4" />
-              重新选择
+              {t.bookmarkConverter.reselect}
             </button>
           </div>
 
           <div>
-            <h4 className="text-lg font-medium text-gray-900 mb-3">书签预览</h4>
+            <h4 className="text-lg font-medium text-gray-900 mb-3">{t.bookmarkConverter.preview}</h4>
             <div className="border border-gray-200 rounded-lg p-3 max-h-96 overflow-y-auto bg-white">
               {renderTree(bookmarks)}
             </div>
           </div>
 
           <div>
-            <h4 className="text-lg font-medium text-gray-900 mb-3">导出为</h4>
+            <h4 className="text-lg font-medium text-gray-900 mb-3">{t.bookmarkConverter.exportTitle}</h4>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={downloadAsPdf}
@@ -424,7 +429,7 @@ ${rowsHtml}
                 className="btn-primary flex items-center justify-center gap-2"
               >
                 <FileType className="h-4 w-4" />
-                {isConverting ? '生成中...' : '下载为 PDF'}
+                {isConverting ? t.bookmarkConverter.generating : t.bookmarkConverter.exportPdf}
               </button>
               <button
                 onClick={downloadAsDocx}
@@ -432,7 +437,7 @@ ${rowsHtml}
                 className="btn-secondary flex items-center justify-center gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isConverting ? '生成中...' : '下载为 Word (.docx)'}
+                {isConverting ? t.bookmarkConverter.generating : t.bookmarkConverter.exportWord}
               </button>
             </div>
           </div>

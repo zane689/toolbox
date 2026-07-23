@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Heart, ArrowRight, Image, Crop, Bookmark } from 'lucide-react'
 import { useToolStore, IconName } from '../../store/useToolStore'
+import { useI18n } from '../../i18n/context'
 
 const iconMap: Record<IconName, React.ReactNode> = {
   image: <Image className="h-6 w-6" />,
@@ -17,6 +18,7 @@ interface ToolCardProps {
 }
 
 function ToolCard({ id, title, description, category, iconName }: ToolCardProps) {
+  const { t } = useI18n()
   const favorites = useToolStore(state => state.favorites)
   const addToFavorites = useToolStore(state => state.addToFavorites)
   const removeFromFavorites = useToolStore(state => state.removeFromFavorites)
@@ -47,7 +49,7 @@ function ToolCard({ id, title, description, category, iconName }: ToolCardProps)
             <button
               onClick={handleFavorite}
               className="p-1.5 rounded-md hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-200 flex-shrink-0"
-              aria-label={isFavorite ? "取消收藏" : "收藏"}
+              aria-label={isFavorite ? t.toolCard.unfavorite : t.toolCard.favorite}
             >
               <Heart
                 className={`h-4 w-4 transition-all duration-200 ${isFavorite ? 'text-pink-500 fill-pink-500' : 'text-gray-400 hover:text-pink-500'}`}
@@ -62,7 +64,7 @@ function ToolCard({ id, title, description, category, iconName }: ToolCardProps)
               {category}
             </div>
             <div className="flex items-center text-gray-600 group-hover:text-gray-900 transition-colors duration-200">
-              <span className="mr-1.5 text-xs font-medium">查看</span>
+              <span className="mr-1.5 text-xs font-medium">{t.toolCard.view}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </div>
           </div>

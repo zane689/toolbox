@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Upload, Download, Settings, Info, Image as ImageIcon, X, Package, Trash2, Crop, Bookmark } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToolStore, IconName } from '../store/useToolStore'
+import { useI18n } from '../i18n/context'
 import BookmarkConverter from '../components/tools/BookmarkConverter'
 
 const iconMap: Record<IconName, React.ReactNode> = {
@@ -24,6 +25,7 @@ interface ImageItem {
 
 function ToolDetail() {
   const { id } = useParams<{ id: string }>()
+  const { t } = useI18n()
   const tools = useToolStore(state => state.tools)
   const tool = tools.find(t => t.id === id)
   const [compressionQuality, setCompressionQuality] = useState(80)
@@ -70,7 +72,7 @@ function ToolDetail() {
 
     const validFiles = files.filter(file => file.type.startsWith('image/'))
     if (validFiles.length < files.length) {
-      setCompressError('部分文件不是图片，已自动过滤')
+      setCompressError(t.imageCompressor.errorFilter)
     } else {
       setCompressError('')
     }
@@ -94,7 +96,7 @@ function ToolDetail() {
 
     const validFiles = files.filter(file => file.type.startsWith('image/'))
     if (validFiles.length < files.length) {
-      setCompressError('部分文件不是图片，已自动过滤')
+      setCompressError(t.imageCompressor.errorFilter)
     } else {
       setCompressError('')
     }
@@ -133,7 +135,7 @@ function ToolDetail() {
             resolve({
               ...item,
               status: 'error',
-              errorMsg: '压缩失败'
+              errorMsg: t.imageCompressor.errorCompress
             })
           }
         }, outputType, currentQuality / 100)
@@ -144,7 +146,7 @@ function ToolDetail() {
         resolve({
           ...item,
           status: 'error',
-          errorMsg: '图片加载失败'
+          errorMsg: t.imageCompressor.errorLoad
         })
       }
 
@@ -220,7 +222,7 @@ function ToolDetail() {
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     } catch (err) {
-      setCompressError('打包下载失败，请尝试单张下载')
+      setCompressError(t.imageCompressor.errorDownload)
       console.error('Download all error:', err)
     }
   }, [images])
@@ -267,10 +269,10 @@ function ToolDetail() {
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <Info className="h-12 w-12 text-gray-400" />
           </div>
-          <h1 className="text-2xl font-bold mb-4 text-gray-900">工具不存在</h1>
+          <h1 className="text-2xl font-bold mb-4 text-gray-900">{t.toolDetail.notFoundTitle}</h1>
           <Link to="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors duration-200">
             <ArrowLeft className="h-5 w-5 mr-2" />
-            返回首页
+            {t.toolDetail.notFoundLink}
           </Link>
         </div>
       </div>
@@ -283,14 +285,14 @@ function ToolDetail() {
       <div className="flex items-center mb-8 text-sm">
         <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 transition-colors duration-200 mr-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          首页
+          {t.toolDetail.breadcrumbHome}
         </Link>
         <span className="text-gray-300">/</span>
         <Link to="/categories" className="flex items-center text-gray-600 hover:text-gray-900 transition-colors duration-200 mx-4">
-          分类
+          {t.toolDetail.breadcrumbCategories}
         </Link>
         <span className="text-gray-300">/</span>
-        <span className="mx-4 text-gray-900 font-medium">{tool.title}</span>
+        <span className="mx-4 text-gray-900 font-medium">{tool.id === 'image-compressor' ? t.tools.imageCompressor : tool.id === 'image-cropper' ? t.tools.imageCropper : tool.id === 'bookmark-converter' ? t.tools.bookmarkConverter : tool.title}</span>
       </div>
 
       {/* Tool Header */}
@@ -300,11 +302,11 @@ function ToolDetail() {
             {iconMap[tool.iconName]}
           </div>
           <div className="flex-grow">
-            <h1 className="text-3xl font-bold mb-2 text-gray-900">{tool.title}</h1>
+            <h1 className="text-3xl font-bold mb-2 text-gray-900">{tool.id === 'image-compressor' ? t.tools.imageCompressor : tool.id === 'image-cropper' ? t.tools.imageCropper : tool.id === 'bookmark-converter' ? t.tools.bookmarkConverter : tool.title}</h1>
             <div className="inline-block px-4 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium mb-4">
-              {tool.category}
+              {tool.id === 'image-compressor' ? t.tools.designTool : tool.id === 'image-cropper' ? t.tools.designTool : tool.id === 'bookmark-converter' ? t.tools.efficiencyTool : tool.category}
             </div>
-            <p className="text-gray-600 text-lg">{tool.description}</p>
+            <p className="text-gray-600 text-lg">{tool.id === 'image-compressor' ? t.tools.imageCompressorDesc : tool.id === 'image-cropper' ? t.tools.imageCropperDesc : tool.id === 'bookmark-converter' ? t.tools.bookmarkConverterDesc : tool.description}</p>
           </div>
         </div>
       </div>
@@ -315,7 +317,7 @@ function ToolDetail() {
           <div className="mb-8">
             <h3 className="text-2xl font-semibold mb-6 flex items-center text-gray-900">
               <Settings className="h-6 w-6 text-gray-600 mr-2" />
-              图片压缩工具
+              {t.imageCompressor.title}
             </h3>
 
             {/* Drop Zone */}
@@ -327,7 +329,7 @@ function ToolDetail() {
               <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 mx-auto mb-4">
                 <Upload className="h-8 w-8" />
               </div>
-              <p className="text-gray-600 mb-4">点击或拖拽图片到此处上传，支持批量上传</p>
+              <p className="text-gray-600 mb-4">{t.imageCompressor.dropzone}</p>
               <input
                 type="file"
                 className="hidden"
@@ -341,7 +343,7 @@ function ToolDetail() {
                 htmlFor="image-upload"
                 className="btn-primary cursor-pointer inline-block"
               >
-                选择图片
+                {t.imageCompressor.uploadBtn}
               </label>
             </div>
             {compressError && (
@@ -354,14 +356,14 @@ function ToolDetail() {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-lg font-medium text-gray-900">
-                  已上传图片 ({images.length}张)
+                  {t.imageCompressor.heading} {t.imageCompressor.imageCount.replace('{count}', String(images.length))}
                 </h4>
                 <button
                   onClick={clearAllImages}
                   className="flex items-center gap-1.5 text-red-500 hover:text-red-600 transition-colors duration-200 text-sm"
                 >
                   <Trash2 className="h-4 w-4" />
-                  清空全部
+                  {t.imageCompressor.clearAll}
                 </button>
               </div>
 
@@ -370,17 +372,17 @@ function ToolDetail() {
                 <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
                   <div className="flex flex-wrap items-center gap-4 text-sm">
                     <span className="text-gray-600">
-                      已完成: <span className="font-medium text-gray-900">{doneCount}/{images.length}</span>
+                      {t.imageCompressor.completed}: <span className="font-medium text-gray-900">{doneCount}/{images.length}</span>
                     </span>
                     <span className="text-gray-600">
-                      原始大小: <span className="font-medium text-gray-900">{formatFileSize(totalOriginalSize)}</span>
+                      {t.imageCompressor.originalSize}: <span className="font-medium text-gray-900">{formatFileSize(totalOriginalSize)}</span>
                     </span>
                     <span className="text-gray-600">
-                      压缩后: <span className="font-medium text-gray-900">{formatFileSize(totalCompressedSize)}</span>
+                      {t.imageCompressor.compressedSize}: <span className="font-medium text-gray-900">{formatFileSize(totalCompressedSize)}</span>
                     </span>
                     {totalOriginalSize > 0 && totalCompressedSize > 0 && (
                       <span className="text-green-600 font-medium">
-                        减少 {getCompressionRatio(totalOriginalSize, totalCompressedSize)}%
+                        {t.imageCompressor.reduced} {getCompressionRatio(totalOriginalSize, totalCompressedSize)}%
                       </span>
                     )}
                   </div>
@@ -408,14 +410,14 @@ function ToolDetail() {
                       <p className="text-xs text-gray-500">{formatFileSize(item.originalSize)}</p>
                       {item.status === 'done' && (
                         <p className="text-xs text-green-600">
-                          压缩后: {formatFileSize(item.compressedSize)} (减少 {getCompressionRatio(item.originalSize, item.compressedSize)}%)
+                          {t.imageCompressor.compressedTo}: {formatFileSize(item.compressedSize)} ({t.imageCompressor.reducedBy} {getCompressionRatio(item.originalSize, item.compressedSize)}%)
                         </p>
                       )}
                       {item.status === 'error' && (
                         <p className="text-xs text-red-500">{item.errorMsg}</p>
                       )}
                       {item.status === 'compressing' && (
-                        <p className="text-xs text-gray-500">压缩中...</p>
+                        <p className="text-xs text-gray-500">{t.imageCompressor.compressing}</p>
                       )}
                     </div>
 
@@ -425,7 +427,7 @@ function ToolDetail() {
                         <button
                           onClick={() => downloadSingleImage(item)}
                           className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-                          title="下载"
+                          title={t.imageCompressor.download}
                         >
                           <Download className="h-4 w-4" />
                         </button>
@@ -433,7 +435,7 @@ function ToolDetail() {
                       <button
                         onClick={() => removeImage(item.id)}
                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors duration-200"
-                        title="删除"
+                        title={t.imageCompressor.delete}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -449,12 +451,12 @@ function ToolDetail() {
             <div className="mb-8">
               <h4 className="text-lg font-medium mb-4 flex items-center text-gray-900">
                 <Settings className="h-5 w-5 text-gray-600 mr-2" />
-                压缩设置
+                {t.imageCompressor.settings}
               </h4>
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between mb-2">
-                    <label className="text-gray-700">压缩质量</label>
+                    <label className="text-gray-700">{t.imageCompressor.quality}</label>
                     <span className="text-gray-900 font-medium">{compressionQuality}%</span>
                   </div>
                   <input
@@ -466,9 +468,9 @@ function ToolDetail() {
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>低质量</span>
-                    <span>中等质量</span>
-                    <span>高质量</span>
+                    <span>{t.imageCompressor.lowQuality}</span>
+                    <span>{t.imageCompressor.mediumQuality}</span>
+                    <span>{t.imageCompressor.highQuality}</span>
                   </div>
                 </div>
               </div>
@@ -489,12 +491,12 @@ function ToolDetail() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    压缩中...
+                    {t.imageCompressor.compressing}
                   </>
                 ) : (
                   <>
                     <Settings className="h-4 w-4" />
-                    压缩全部 ({pendingCount}张待压缩)
+                    {t.imageCompressor.compressAll} ({pendingCount}{t.imageCompressor.pending})
                   </>
                 )}
               </button>
@@ -505,7 +507,7 @@ function ToolDetail() {
                   className="btn-secondary flex items-center justify-center gap-2"
                 >
                   <Package className="h-4 w-4" />
-                  {doneCount === 1 ? '下载图片' : '打包下载全部'}
+                  {doneCount === 1 ? t.imageCompressor.downloading : t.imageCompressor.downloadAll}
                 </button>
               )}
             </div>
@@ -523,78 +525,36 @@ function ToolDetail() {
       <div className="bg-gray-50 rounded-lg p-6 mt-8 border border-gray-200 animate-fade-in">
         <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
           <Info className="h-5 w-5 mr-2" />
-          使用提示
+          {t.toolDetail.tipsTitle}
         </h4>
         {tool.id === 'image-compressor' && (
           <ul className="space-y-2 text-gray-700">
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>支持批量上传和压缩多张图片</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>选择高质量设置时，图片质量损失较小，但压缩率也较低</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>支持 JPG、PNG、WebP 等常见图片格式</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>压缩后的图片会保持原始图片的宽高比</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>多张图片会自动打包成 ZIP 文件下载</span>
-            </li>
+            {t.imageCompressor.tips.map((tip, i) => (
+              <li key={i} className="flex items-start">
+                <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                <span>{tip}</span>
+              </li>
+            ))}
           </ul>
         )}
         {tool.id === 'image-cropper' && (
           <ul className="space-y-2 text-gray-700">
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>支持 JPG、PNG、WebP 等常见图片格式</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>提供多种固定比例和自由裁剪模式</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>在图片上拖拽鼠标绘制裁剪区域</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>裁剪框可拖动位置，也可拖动边角调整大小</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>支持选择输出格式（JPG/PNG）和质量调节</span>
-            </li>
+            {t.imageCropper.tips.map((tip, i) => (
+              <li key={i} className="flex items-start">
+                <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                <span>{tip}</span>
+              </li>
+            ))}
           </ul>
         )}
         {tool.id === 'bookmark-converter' && (
           <ul className="space-y-2 text-gray-700">
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>支持 Chrome / Edge / Firefox / Opera / QQ浏览器 浏览器导出的 HTML 书签文件</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>自动解析文件夹结构、链接标题和添加时间</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>可一键导出为 PDF 文件（链接可点击跳转）</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>可一键导出为 Word (.docx) 文档，保留层级结构</span>
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-              <span>所有处理均在浏览器本地完成，文件不会上传到服务器</span>
-            </li>
+            {t.bookmarkConverter.tips.map((tip, i) => (
+              <li key={i} className="flex items-start">
+                <span className="w-2 h-2 bg-gray-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                <span>{tip}</span>
+              </li>
+            ))}
           </ul>
         )}
       </div>
@@ -603,6 +563,7 @@ function ToolDetail() {
 }
 
 function ImageCropperTool() {
+  const { t } = useI18n()
   const [sourceImage, setSourceImage] = useState<string | null>(null)
   const [fileName, setFileName] = useState('')
   const [cropError, setCropError] = useState('')
@@ -620,21 +581,21 @@ function ImageCropperTool() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const ratios = [
-    { label: '自由', value: null as number | null },
-    { label: '1:1', value: 1 },
-    { label: '4:3', value: 4 / 3 },
-    { label: '3:4', value: 3 / 4 },
-    { label: '16:9', value: 16 / 9 },
-    { label: '9:16', value: 9 / 16 },
-    { label: '3:2', value: 3 / 2 },
-    { label: '2:3', value: 2 / 3 },
+    { key: 'free', label: t.imageCropper.free, value: null as number | null },
+    { key: '1:1', label: '1:1', value: 1 },
+    { key: '4:3', label: '4:3', value: 4 / 3 },
+    { key: '3:4', label: '3:4', value: 3 / 4 },
+    { key: '16:9', label: '16:9', value: 16 / 9 },
+    { key: '9:16', label: '9:16', value: 9 / 16 },
+    { key: '3:2', label: '3:2', value: 3 / 2 },
+    { key: '2:3', label: '2:3', value: 2 / 3 },
   ]
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      setCropError('请选择图片文件')
+      setCropError(t.imageCropper.errorFileType)
       return
     }
     setCropError('')
@@ -654,7 +615,7 @@ function ImageCropperTool() {
     const file = e.dataTransfer.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      setCropError('请选择图片文件')
+      setCropError(t.imageCropper.errorFileType)
       return
     }
     setCropError('')
@@ -884,7 +845,7 @@ function ImageCropperTool() {
       <div className="mb-8">
         <h3 className="text-2xl font-semibold mb-6 flex items-center text-gray-900">
           <Crop className="h-6 w-6 text-gray-600 mr-2" />
-          图片裁剪工具
+          {t.imageCropper.title}
         </h3>
 
         {/* Upload */}
@@ -897,7 +858,7 @@ function ImageCropperTool() {
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 mx-auto mb-4">
               <Upload className="h-8 w-8" />
             </div>
-            <p className="text-gray-600 mb-4">点击或拖拽图片到此处上传</p>
+            <p className="text-gray-600 mb-4">{t.imageCropper.dropzone}</p>
             <input
               type="file"
               className="hidden"
@@ -907,7 +868,7 @@ function ImageCropperTool() {
               ref={fileInputRef}
             />
             <label htmlFor="crop-upload" className="btn-primary cursor-pointer inline-block">
-              选择图片
+              {t.imageCropper.uploadBtn}
             </label>
           </div>
         )}
@@ -919,7 +880,7 @@ function ImageCropperTool() {
         <div className="space-y-6">
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm text-gray-700 font-medium">裁剪比例:</span>
+            <span className="text-sm text-gray-700 font-medium">{t.imageCropper.ratioLabel}:</span>
             {ratios.map((r) => (
               <button
                 key={r.label}
@@ -945,7 +906,7 @@ function ImageCropperTool() {
               className="ml-auto flex items-center gap-1.5 text-red-500 hover:text-red-600 transition-colors duration-200 text-sm"
             >
               <X className="h-4 w-4" />
-              重新选择
+              {t.imageCropper.reselect}
             </button>
           </div>
 
@@ -959,7 +920,7 @@ function ImageCropperTool() {
             <img
               ref={imgRef}
               src={sourceImage}
-              alt="待裁剪"
+              alt={t.imageCropper.imgAlt}
               className="block"
               onLoad={handleImageLoad}
               draggable={false}
@@ -1036,7 +997,7 @@ function ImageCropperTool() {
           {/* Info */}
           {cropArea.width > 0 && cropArea.height > 0 && (
             <p className="text-sm text-gray-600">
-              裁剪区域: {Math.round(cropArea.width * (imageSize.width / displaySize.width))} x{' '}
+              {t.imageCropper.cropArea}: {Math.round(cropArea.width * (imageSize.width / displaySize.width))} x{' '}
               {Math.round(cropArea.height * (imageSize.height / displaySize.height))} px
             </p>
           )}
@@ -1044,7 +1005,7 @@ function ImageCropperTool() {
           {/* Output Settings */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-4">
             <div className="flex flex-wrap items-center gap-4">
-              <span className="text-sm text-gray-700 font-medium">输出格式:</span>
+              <span className="text-sm text-gray-700 font-medium">{t.imageCropper.outputFormat}:</span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setOutputFormat('image/jpeg')}
@@ -1064,7 +1025,7 @@ function ImageCropperTool() {
                       : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  PNG
+                  {t.imageCropper.png}
                 </button>
               </div>
             </div>
@@ -1072,7 +1033,7 @@ function ImageCropperTool() {
             {outputFormat === 'image/jpeg' && (
               <div>
                 <div className="flex justify-between mb-2">
-                  <label className="text-sm text-gray-700">输出质量</label>
+                  <label className="text-sm text-gray-700">{t.imageCropper.outputQuality}</label>
                   <span className="text-sm text-gray-900 font-medium">{outputQuality}%</span>
                 </div>
                 <input
@@ -1084,8 +1045,8 @@ function ImageCropperTool() {
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
                 />
                 <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>低质量（体积小）</span>
-                  <span>高质量（体积大）</span>
+                  <span>{t.imageCropper.lowQualitySmall}</span>
+                  <span>{t.imageCropper.highQualityLarge}</span>
                 </div>
               </div>
             )}
@@ -1099,10 +1060,10 @@ function ImageCropperTool() {
               disabled={cropArea.width < 10 || cropArea.height < 10}
             >
               <Download className="h-4 w-4" />
-              裁剪并下载
+              {t.imageCropper.cropBtn}
             </button>
             <p className="text-xs text-gray-500 self-center">
-              拖拽绘制裁剪区域，拖动框移动位置，拖动边角调整大小
+              {t.imageCropper.helper}
             </p>
           </div>
         </div>
