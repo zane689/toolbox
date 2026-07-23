@@ -791,27 +791,44 @@ function ImageCropperTool() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    const container = containerRef.current
+    if (!container) return
+    const containerWidth = container.clientWidth
+    const containerHeight = container.clientHeight
+
+    // Calculate image offset within the container (due to flex centering)
+    const offsetX = Math.max(0, (containerWidth - displaySize.width) / 2)
+    const offsetY = Math.max(0, (containerHeight - displaySize.height) / 2)
+
     const scaleX = imageSize.width / displaySize.width
     const scaleY = imageSize.height / displaySize.height
 
-    const sourceX = cropArea.x * scaleX
-    const sourceY = cropArea.y * scaleY
+    const sourceX = (cropArea.x - offsetX) * scaleX
+    const sourceY = (cropArea.y - offsetY) * scaleY
     const sourceWidth = cropArea.width * scaleX
     const sourceHeight = cropArea.height * scaleY
 
-    canvas.width = sourceWidth
-    canvas.height = sourceHeight
+    // Clamp to image boundaries
+    const clampedSourceX = Math.max(0, sourceX)
+    const clampedSourceY = Math.max(0, sourceY)
+    const clampedWidth = Math.min(sourceWidth, imageSize.width - clampedSourceX)
+    const clampedHeight = Math.min(sourceHeight, imageSize.height - clampedSourceY)
+
+    if (clampedWidth < 1 || clampedHeight < 1) return
+
+    canvas.width = clampedWidth
+    canvas.height = clampedHeight
 
     ctx.drawImage(
       imgRef.current,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
+      clampedSourceX,
+      clampedSourceY,
+      clampedWidth,
+      clampedHeight,
       0,
       0,
-      sourceWidth,
-      sourceHeight
+      clampedWidth,
+      clampedHeight
     )
 
     const mimeType = outputFormat
